@@ -1,9 +1,14 @@
-# ESPHome Dynamic Deadband Filter (DDF)
+# Dynamic Deadband Filter (DDF) for ESPHome 
 # This lambda filter implements a dynamic deadband that:
 # - Tracks upper and lower bounds that expand when data exceeds them
 # - Maintains a deadband (range between bounds)
 # - Slides the deadband when trend continues in same direction
 # - Expands bounds independently when trend reverses
+
+# This should eliminate most of the noise from the sensor, like a moving average, median, or EMA filter.
+# However, this filter adds no latency. Actual value changes are immediate.
+# No tuning is needed, just apply the filter to the sensor.
+# This filter uses very little memory, as only 6 static variables are used.
 
 # - Behavior:
 #   * When trending up and value exceeds upper_bound: deadband slides up
@@ -26,6 +31,7 @@
     static float previous_value = NAN;
     static int trend = 0; // -1 = down, 0 = neutral, 1 = up
     static float deadband_size = 0.0; // Initial deadband size
+    static float contraction_factor = 0.998; // Deadband contraction factor (0.2% reduction)
     
     float current_value = x;
     
@@ -51,36 +57,48 @@
     // Check if trend has reversed
     bool trend_reversed = (trend != 0 && current_trend != 0 && trend != current_trend);
     
+    // Check if bounds are exceeded
+    bool upper_exceeded = current_value > upper_bound;
+    bool lower_exceeded = current_value < lower_bound;
+    
     // Update bounds based on behavior
     if (trend_reversed) {
-      // Trend reversed: expand bounds independently
-      if (current_value > upper_bound) {
+      // Case 3: Trend reversal with bound exceeded
+      // Only move the bound in question, leave the other untouched. Update deadband_size.
+      if (upper_exceeded) {
         upper_bound = current_value;
-      }
-      if (current_value < lower_bound) {
+        deadband_size = upper_bound - lower_bound;
+      } else if (lower_exceeded) {
         lower_bound = current_value;
+        deadband_size = upper_bound - lower_bound;
+      } else {
+        // Case 2: Trend reversal without exceeding bound
+        // Move bounds toward each other by 0.2%
+        float center = (upper_bound + lower_bound) / 2.0;
+        float current_deadband = upper_bound - lower_bound;
+        // Contract deadband by 0.2%
+        deadband_size = current_deadband * contraction_factor;
+        // Recalculate bounds centered around the same center
+        upper_bound = center + deadband_size / 2.0;
+        lower_bound = center - deadband_size / 2.0;
       }
     } else {
-      // Trend continues or neutral: slide deadband or expand independently
-      if (current_trend == 1 && current_value > upper_bound) {
-        // Trending up and exceeded upper bound: slide deadband up
-        float excess = current_value - upper_bound;
-        upper_bound = current_value;
-        lower_bound += excess; // Slide lower bound up by same amount
-      } else if (current_trend == -1 && current_value < lower_bound) {
-        // Trending down and below lower bound: slide deadband down
-        float excess = lower_bound - current_value;
-        lower_bound = current_value;
-        upper_bound -= excess; // Slide upper bound down by same amount
-      } else {
-        // Value within bounds or trend doesn't match: expand independently
-        if (current_value > upper_bound) {
+      // No trend reversal
+      if (upper_exceeded || lower_exceeded) {
+        // Case 1: Bound exceeded without trend reversal
+        // Move the bound in question and the opposite bound by the same amount, keeping deadband unchanged
+        if (upper_exceeded) {
+          float excess = current_value - upper_bound;
           upper_bound = current_value;
-        }
-        if (current_value < lower_bound) {
+          lower_bound += excess; // Slide lower bound up by same amount
+        } else if (lower_exceeded) {
+          float excess = lower_bound - current_value;
           lower_bound = current_value;
+          upper_bound -= excess; // Slide upper bound down by same amount
         }
+        // deadband_size remains unchanged (sliding behavior)
       }
+      // If no bound exceeded and no trend reversal, do nothing
     }
     
     // Update state
