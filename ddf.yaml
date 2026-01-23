@@ -1,4 +1,4 @@
-# Dynamic Deadband Filter (DDF) for ESPHome 
+# ExperimentalDynamic Deadband Filter (DDF) for ESPHome 
 # This lambda filter implements a dynamic deadband that:
 # - Tracks upper and lower bounds that expand when data exceeds them
 # - Maintains a deadband (range between bounds)
@@ -9,6 +9,7 @@
 # However, this filter adds no latency. Actual value changes are immediate.
 # No tuning is needed, just apply the filter to the sensor.
 # This filter uses very little memory, as only 6 static variables are used.
+# Maybe 1 in 1000 raw samples the filtered output will actually be noise. This is because the errors follow a normal distribution.
 
 # - Behavior:
 #   * When trending up and value exceeds upper_bound: deadband slides up
