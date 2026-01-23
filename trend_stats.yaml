@@ -4,36 +4,6 @@
 
 substitutions:
   name: trend-stats
-  wifi_ssid: "YourSSID"
-  wifi_password: "YourPassword"
-
-esphome:
-  name: ${name}
-  friendly_name: ${name}
-
-esp32:
-  board: esp32dev
-  framework:
-    type: arduino
-
-# esp8266: use this instead of esp32 if needed; ADC pin: A0
-# esp8266:
-#   board: esp01_1m
-
-wifi:
-  ssid: "${wifi_ssid}"
-  password: "${wifi_password}"
-  ap:
-    ssid: "${name} Fallback"
-    password: "12345678"
-
-captive_portal:
-
-api:
-
-ota:
-
-logger:
 
 # ---------------------------------------------------------------------------
 # Globals: counters updated by the trend_stats filter, read by template sensors
@@ -123,54 +93,49 @@ sensor:
   - platform: template
     name: "${name} Datapoints"
     id: datapoints_sensor
-    unit_of_measurement: "pts"
+    unit_of_measurement: ""
     state_class: total_increasing
     accuracy_decimals: 0
-    update_interval: 5s
+    update_interval: 60s
     lambda: |-
       return (float) id(datapoint_count);
 
   - platform: template
     name: "${name} Reversals"
     id: reversals_sensor
-    unit_of_measurement: "rev"
+    unit_of_measurement: ""
     state_class: total_increasing
     accuracy_decimals: 0
-    update_interval: 5s
+    update_interval: 60s
     lambda: |-
       return (float) id(reversal_count);
 
   - platform: template
-    name: "${name} Double Reversals"
+    name: "${name} Double Reverses"
     id: double_reversals_sensor
-    unit_of_measurement: "dbl"
+    unit_of_measurement: ""
     state_class: total_increasing
     accuracy_decimals: 0
-    update_interval: 5s
+    update_interval: 60s
     lambda: |-
       return (float) id(double_reversal_count);
 
   - platform: template
     name: "${name} Non-Reversals"
     id: non_reversals_sensor
-    unit_of_measurement: "nrv"
+    unit_of_measurement: ""
     state_class: total_increasing
     accuracy_decimals: 0
-    update_interval: 5s
+    update_interval: 60s
     lambda: |-
       return (float) id(non_reversal_count);
 
   - platform: template
     name: "${name} Flatlines"
     id: flatlines_sensor
-    unit_of_measurement: "flt"
+    unit_of_measurement: ""
     state_class: total_increasing
     accuracy_decimals: 0
-    update_interval: 5s
+    update_interval: 60s
     lambda: |-
-      return (float) id(flatline_count);
-
-# ---------------------------------------------------------------------------
-# Notes: Set wifi_ssid and wifi_password in substitutions (or use !secret).
-#        Replace the ADC source with DHT, BME280, etc. and move the filter
-#        into that sensor's filters. ESP8266: use pin A0 for ADC.
+      return (float) id(flatline_count)
