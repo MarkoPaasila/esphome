@@ -1,32 +1,128 @@
 # Example ESPHome configuration using the hp_ekf external component.
-# Use this component from a device YAML by adding the external_components
-# block and an hp_ekf: section.
+# The component implements an Extended Kalman Filter for inlet/outlet temperature
+# and absolute humidity with temperature-rate states. It publishes 8 sensors:
+#   - HP EKF Inlet Temperature (°C)
+#   - HP EKF Outlet Temperature (°C)
+#   - HP EKF Inlet Absolute Humidity (g/m³)
+#   - HP EKF Outlet Absolute Humidity (g/m³)
+#   - HP EKF Inlet Temperature Rate (°C/s)
+#   - HP EKF Outlet Temperature Rate (°C/s)
+#   - HP EKF Inlet RH (est) (fraction)
+#   - HP EKF Outlet RH (est) (fraction)
 #
-# In your device YAML (e.g. node.yaml in the same folder as components/):
-#
-# external_components:
-#   - source:
-#       type: local
-#       path: components
-#     components: [ hp_ekf ]
-#
-# hp_ekf:
-#   id: my_hp_ekf
-#   update_interval: 60s
+# Wire your real inlet/outlet temperature and RH sensors via inlet_temperature_id,
+# inlet_rh_id, outlet_temperature_id, outlet_rh_id. Replace the template sensors
+# below with your actual sensor platform (e.g. dht, bme280).
 
 substitutions:
   name: hp-ekf-example
 
-
-# Load the hp_ekf external component from the local components folder
+# Load the hp_ekf external component (path is relative to this YAML file)
 external_components:
   - source:
       type: local
-      path: components
-    components: [ hp_ekf ]
+      path: .
+    components: [hp_ekf]
+
+# Placeholder input sensors – replace with your real sensors (e.g. dht, bme280).
+# These use constant lambdas for a minimal runnable example.
+sensor:
+  - platform: template
+    sensors:
+      inlet_temp:
+        name: "${name} Inlet Temperature"
+        id: inlet_temp
+        unit_of_measurement: "\u00b0C"
+        device_class: temperature
+        state_class: measurement
+        accuracy_decimals: 2
+        update_interval: 5s
+        lambda: "return 20.0f;"
+      inlet_rh:
+        name: "${name} Inlet RH"
+        id: inlet_rh
+        unit_of_measurement: "%"
+        device_class: humidity
+        state_class: measurement
+        accuracy_decimals: 1
+        update_interval: 5s
+        lambda: "return 0.5f;"
+      outlet_temp:
+        name: "${name} Outlet Temperature"
+        id: outlet_temp
+        unit_of_measurement: "\u00b0C"
+        device_class: temperature
+        state_class: measurement
+        accuracy_decimals: 2
+        update_interval: 5s
+        lambda: "return 20.0f;"
+      outlet_rh:
+        name: "${name} Outlet RH"
+        id: outlet_rh
+        unit_of_measurement: "%"
+        device_class: humidity
+        state_class: measurement
+        accuracy_decimals: 1
+        update_interval: 5s
+        lambda: "return 0.5f;"
 
 # HP-EKF component instance
 hp_ekf:
-  id: hp_ekf
-  name: ${name}_hp_ekf
-  update_interval: 60s
+  id: hp_ekf1
+  update_interval: 500ms
+  pressure_pa: 101325
+  use_inlet_temp: true
+  use_inlet_rh: true
+  use_outlet_temp: true
+  use_outlet_rh: true
+
+  inlet_temperature_id: inlet_temp
+  inlet_rh_id: inlet_rh
+  outlet_temperature_id: outlet_temp
+  outlet_rh_id: outlet_rh
+
+  # Optional: initial state (otherwise inferred from first T+RH or defaults)
+  initial_state:
+    tin_c: 20.0
+    tout_c: 20.0
+    ahin_gm3: 8.0
+    ahout_gm3: 8.0
+    tin_rate_cps: 0.0
+    tout_rate_cps: 0.0
+
+  # Optional: initial covariance diagonal (variances)
+  initial_covariance:
+    tin: 4.0
+    tout: 4.0
+    ahin: 4.0
+    ahout: 4.0
+    tin_rate: 0.25
+    tout_rate: 0.25
+
+  # Process noise: q_acc (°C²/s³) for T blocks; q_ahin/q_ahout per-second variance
+  process_noise:
+    q_acc_in: 0.02
+    q_acc_out: 0.02
+    q_ahin: 0.02
+    q_ahout: 0.02
+
+  # Measurement noise (variances per sensor)
+  measurement_noise:
+    tin: 0.04
+    tout: 0.04
+    rhin: 0.0004
+    rhout: 0.0004
+
+  # Gating: Mahalanobis d² thresholds (1 DoF)
+  gating:
+    temp_d2: 6.63
+    rh_d2: 6.63
+
+  # Optional: clamps for state
+  clamps:
+    temp_c:
+      min: -40.0
+      max: 100.0
+    rate_cps:
+      min: -1.0
+      max: 1.0
