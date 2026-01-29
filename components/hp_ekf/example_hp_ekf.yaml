@@ -1,0 +1,32 @@
+# Example ESPHome configuration using the hp_ekf external component.
+# Use this component from a device YAML by adding the external_components
+# block and an hp_ekf: section.
+#
+# In your device YAML (e.g. node.yaml in the same folder as components/):
+#
+# external_components:
+#   - source:
+#       type: local
+#       path: components
+#     components: [ hp_ekf ]
+#
+# hp_ekf:
+#   id: my_hp_ekf
+#   update_interval: 60s
+
+substitutions:
+  name: hp-ekf-example
+
+
+# Load the hp_ekf external component from the local components folder
+external_components:
+  - source:
+      type: local
+      path: components
+    components: [ hp_ekf ]
+
+# HP-EKF component instance
+hp_ekf:
+  id: hp_ekf
+  name: ${name}_hp_ekf
+  update_interval: 60s
