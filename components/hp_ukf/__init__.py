@@ -1,4 +1,4 @@
-"""HP-EKF external component for ESPHome."""
+"""HP-UKF external component for ESPHome."""
 
 import esphome.config_validation as cv
 import esphome.codegen as cg
@@ -6,15 +6,15 @@ from esphome.const import CONF_ID
 
 DEPENDENCIES = []
 
-hp_ekf_ns = cg.esphome_ns.namespace("hp_ekf")
-HpEkfComponent = hp_ekf_ns.class_("HpEkfComponent", cg.Component)
+hp_ukf_ns = cg.esphome_ns.namespace("hp_ukf")
+HpUkfComponent = hp_ukf_ns.class_("HpUkfComponent", cg.Component)
 
-CONF_HP_EKF = "hp_ekf"
+CONF_HP_UKF = "hp_ukf"
 CONF_UPDATE_INTERVAL = "update_interval"
 
 CONFIG_SCHEMA = cv.Schema(
     {
-        cv.GenerateID(): cv.declare_id(HpEkfComponent),
+        cv.GenerateID(): cv.declare_id(HpUkfComponent),
         cv.Optional(CONF_UPDATE_INTERVAL, default="60s"): cv.update_interval,
     }
 ).extend(cv.COMPONENT_SCHEMA)
