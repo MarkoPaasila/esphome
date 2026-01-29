@@ -138,7 +138,7 @@ void HpUkfComponent::update() {
 
 void HpUkfComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "HP-UKF component");
-  ESP_LOGCONFIG(TAG, "  Update interval: %u ms", this->get_interval());
+  ESP_LOGCONFIG(TAG, "  Update interval: %u ms", this->get_update_interval());
   ESP_LOGCONFIG(TAG, "  Track derivatives (dT_in, dT_out, dRH_in, dRH_out): %s",
                 track_derivatives_ ? "yes" : "no");
   ESP_LOGCONFIG(TAG, "  Inlet temperature sensor: %s", inlet_temperature_ ? "set" : "not set");
