@@ -8,7 +8,7 @@ from esphome.components import sensor
 DEPENDENCIES = ["sensor"]
 
 hp_ukf_ns = cg.esphome_ns.namespace("hp_ukf")
-HpUkfComponent = hp_ukf_ns.class_("HpUkfComponent", cg.Component)
+HpUkfComponent = hp_ukf_ns.class_("HpUkfComponent", cg.PollingComponent)
 
 CONF_HP_UKF = "hp_ukf"
 CONF_UPDATE_INTERVAL = "update_interval"
