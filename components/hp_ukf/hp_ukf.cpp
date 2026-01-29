@@ -42,7 +42,6 @@ void HpUkfComponent::setup() {
   filter_.set_initial_state(x0, P0);
 
   filtered_inlet_temperature_.set_name("Filtered Inlet Temperature");
-  filtered_inlet_temperature_.set_object_id("filtered_inlet_temperature");
   filtered_inlet_temperature_.set_unit_of_measurement("°C");
   filtered_inlet_temperature_.set_device_class("temperature");
   filtered_inlet_temperature_.set_state_class(sensor::STATE_CLASS_MEASUREMENT);
@@ -50,7 +49,6 @@ void HpUkfComponent::setup() {
   App.register_sensor(&filtered_inlet_temperature_);
 
   filtered_inlet_humidity_.set_name("Filtered Inlet Humidity");
-  filtered_inlet_humidity_.set_object_id("filtered_inlet_humidity");
   filtered_inlet_humidity_.set_unit_of_measurement("%");
   filtered_inlet_humidity_.set_device_class("humidity");
   filtered_inlet_humidity_.set_state_class(sensor::STATE_CLASS_MEASUREMENT);
@@ -58,7 +56,6 @@ void HpUkfComponent::setup() {
   App.register_sensor(&filtered_inlet_humidity_);
 
   filtered_outlet_temperature_.set_name("Filtered Outlet Temperature");
-  filtered_outlet_temperature_.set_object_id("filtered_outlet_temperature");
   filtered_outlet_temperature_.set_unit_of_measurement("°C");
   filtered_outlet_temperature_.set_device_class("temperature");
   filtered_outlet_temperature_.set_state_class(sensor::STATE_CLASS_MEASUREMENT);
@@ -66,7 +63,6 @@ void HpUkfComponent::setup() {
   App.register_sensor(&filtered_outlet_temperature_);
 
   filtered_outlet_humidity_.set_name("Filtered Outlet Humidity");
-  filtered_outlet_humidity_.set_object_id("filtered_outlet_humidity");
   filtered_outlet_humidity_.set_unit_of_measurement("%");
   filtered_outlet_humidity_.set_device_class("humidity");
   filtered_outlet_humidity_.set_state_class(sensor::STATE_CLASS_MEASUREMENT);
@@ -74,7 +70,6 @@ void HpUkfComponent::setup() {
   App.register_sensor(&filtered_outlet_humidity_);
 
   filtered_inlet_temperature_derivative_.set_name("Filtered Inlet Temperature Derivative");
-  filtered_inlet_temperature_derivative_.set_object_id("filtered_inlet_temperature_derivative");
   filtered_inlet_temperature_derivative_.set_unit_of_measurement("°C/s");
   filtered_inlet_temperature_derivative_.set_device_class("temperature");
   filtered_inlet_temperature_derivative_.set_state_class(sensor::STATE_CLASS_MEASUREMENT);
@@ -82,7 +77,6 @@ void HpUkfComponent::setup() {
   App.register_sensor(&filtered_inlet_temperature_derivative_);
 
   filtered_outlet_temperature_derivative_.set_name("Filtered Outlet Temperature Derivative");
-  filtered_outlet_temperature_derivative_.set_object_id("filtered_outlet_temperature_derivative");
   filtered_outlet_temperature_derivative_.set_unit_of_measurement("°C/s");
   filtered_outlet_temperature_derivative_.set_device_class("temperature");
   filtered_outlet_temperature_derivative_.set_state_class(sensor::STATE_CLASS_MEASUREMENT);
@@ -90,7 +84,6 @@ void HpUkfComponent::setup() {
   App.register_sensor(&filtered_outlet_temperature_derivative_);
 
   filtered_inlet_humidity_derivative_.set_name("Filtered Inlet Humidity Derivative");
-  filtered_inlet_humidity_derivative_.set_object_id("filtered_inlet_humidity_derivative");
   filtered_inlet_humidity_derivative_.set_unit_of_measurement("%/s");
   filtered_inlet_humidity_derivative_.set_device_class("humidity");
   filtered_inlet_humidity_derivative_.set_state_class(sensor::STATE_CLASS_MEASUREMENT);
@@ -98,7 +91,6 @@ void HpUkfComponent::setup() {
   App.register_sensor(&filtered_inlet_humidity_derivative_);
 
   filtered_outlet_humidity_derivative_.set_name("Filtered Outlet Humidity Derivative");
-  filtered_outlet_humidity_derivative_.set_object_id("filtered_outlet_humidity_derivative");
   filtered_outlet_humidity_derivative_.set_unit_of_measurement("%/s");
   filtered_outlet_humidity_derivative_.set_device_class("humidity");
   filtered_outlet_humidity_derivative_.set_state_class(sensor::STATE_CLASS_MEASUREMENT);
