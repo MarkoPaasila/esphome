@@ -42,6 +42,7 @@ class HpUkfFilter {
   void set_em_lambda_q(float v) { em_lambda_q_ = v; }
   void set_em_lambda_r_inlet(float v) { em_lambda_r_inlet_ = v; }
   void set_em_lambda_r_outlet(float v) { em_lambda_r_outlet_ = v; }
+  void set_em_inflation(float v) { em_inflation_ = v; }
   bool em_autotune_enabled() const { return em_enabled_; }
   float get_em_lambda_q() const { return em_lambda_q_; }
   float get_em_lambda_r_inlet() const { return em_lambda_r_inlet_; }
@@ -62,6 +63,7 @@ class HpUkfFilter {
   float em_lambda_q_{0.995f};
   float em_lambda_r_inlet_{0.998f};
   float em_lambda_r_outlet_{0.98f};
+  float em_inflation_{0.5f};
   static constexpr float R_MIN = 1e-6f;
   static constexpr float Q_MIN = 1e-10f;
 

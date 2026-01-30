@@ -63,6 +63,7 @@ hp_ukf:
 | `em_lambda_q`                | float   | `0.995` | Forgetting factor for Q (process variance). Range (0, 1]; higher = slower adaptation. |
 | `em_lambda_r_inlet`          | float   | `0.998` | Forgetting factor for R of inlet T and RH. Inlet changes little; use higher value. |
 | `em_lambda_r_outlet`         | float   | `0.98`  | Forgetting factor for R of outlet T and RH. Outlet can change ~1°C/s, 1%/s; use lower value for faster adaptation. |
+| `em_inflation`               | float   | `0.5`   | Inflation factor applied to EM estimates before smoothing (non-cumulative). Default 0.5 yields R and Q 50% larger. Range [0, 2]. |
 
 Optional EM sensors (only created if configured): `em_q_t_in`, `em_q_rh_in`, `em_q_t_out`, `em_q_rh_out`, `em_q_dt_in`, `em_q_dt_out`, `em_q_drh_in`, `em_q_drh_out` (process noise diagonal, variance units); `em_r_t_in`, `em_r_rh_in`, `em_r_t_out`, `em_r_rh_out` (measurement noise diagonal); `em_lambda_q_sensor`, `em_lambda_r_inlet_sensor`, `em_lambda_r_outlet_sensor` (current lambda values for debugging).
 
@@ -87,6 +88,7 @@ When `em_autotune: true`, the filter recursively adapts the diagonal of Q (proce
 - **lambda_Q**: One forgetting factor for all of Q; higher (e.g. 0.995) = slower adaptation of process noise.
 - **lambda_R_inlet**: For inlet temperature and humidity (indices 0, 1). Inlet is expected to change much less than outlet; use a higher value (e.g. 0.998) so R adapts slowly.
 - **lambda_R_outlet**: For outlet temperature and humidity (indices 2, 3). Outlet can change significantly (e.g. ~1°C/s, ~1%/s); use a lower value (e.g. 0.98) so R adapts faster.
+- **em_inflation**: Multiplier applied to the raw EM estimate (r_est, q_est) before exponential smoothing; not cumulative. Default 0.5 makes the smoothed R and Q 50% larger than the uninflated estimate.
 
 Recommended: keep `em_lambda_r_inlet` > `em_lambda_r_outlet` so outlet measurement noise adapts faster than inlet. All lambdas must be in (0, 1]. Optional sensors (e.g. `em_q_t_out`, `em_r_t_out`) expose the current Q/R diagonal and lambda values for verification.
 

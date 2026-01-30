@@ -8,26 +8,26 @@ namespace hp_ukf {
 void HpUkfFilter::set_state_dimension(int n) {
   n_ = (n == 4 || n == 8) ? n : 8;
   update_weights();
-  // Default process noise (from fd25 EM-converged values); derivatives unchanged.
+  // Default process noise (from EM-converged log copy-paste).
   for (int i = 0; i < n_ * n_; i++)
     Q_[i] = 0.0f;
-  Q_[0 * n_ + 0] = 0.000337f;   // T_in °C²
-  Q_[1 * n_ + 1] = 0.000183f;   // RH_in %²
-  Q_[2 * n_ + 2] = 0.000829f;   // T_out °C²
-  Q_[3 * n_ + 3] = 0.001065f;   // RH_out %²
+  Q_[0 * n_ + 0] = 0.02255297f;   // T_in °C²
+  Q_[1 * n_ + 1] = 0.03863900f;   // RH_in %²
+  Q_[2 * n_ + 2] = 0.03064128f;   // T_out °C²
+  Q_[3 * n_ + 3] = 0.04204632f;   // RH_out %²
   if (n_ >= 8) {
-    Q_[4 * n_ + 4] = 0.01f;   // dT_in
-    Q_[5 * n_ + 5] = 0.01f;   // dT_out
-    Q_[6 * n_ + 6] = 0.001f;  // dRH_in
-    Q_[7 * n_ + 7] = 0.001f;  // dRH_out
+    Q_[4 * n_ + 4] = 0.004649542f;  // dT_in
+    Q_[5 * n_ + 5] = 0.005577928f;  // dT_out
+    Q_[6 * n_ + 6] = 0.007255317f;  // dRH_in
+    Q_[7 * n_ + 7] = 0.007194013f;  // dRH_out
   }
-  // Default measurement noise (from fd25 EM-converged values).
+  // Default measurement noise (from EM-converged log copy-paste).
   for (int i = 0; i < M * M; i++)
     R_[i] = 0.0f;
-  R_[0 * M + 0] = 0.025809f;   // T_in °C²
-  R_[1 * M + 1] = 0.189530f;   // RH_in %²
-  R_[2 * M + 2] = 0.000058f;   // T_out °C²
-  R_[3 * M + 3] = 0.000374f;   // RH_out %²
+  R_[0 * M + 0] = 0.1317456f;    // T_in °C²
+  R_[1 * M + 1] = 0.2825074f;    // RH_in %²
+  R_[2 * M + 2] = 0.001090135f;  // T_out °C²
+  R_[3 * M + 3] = 0.0002252902f; // RH_out %²
 }
 
 void HpUkfFilter::update_weights() {
@@ -331,6 +331,7 @@ void HpUkfFilter::update(const float *z, const bool *mask) {
       float r_est = innov[i] * innov[i] - Pzz_prior_ii[i];
       if (r_est < R_MIN)
         r_est = R_MIN;
+      r_est *= (1.0f + em_inflation_);
       float r_old = R_[g * M + g];
       R_[g * M + g] = lambda_r * r_old + (1.0f - lambda_r) * r_est;
       if (R_[g * M + g] < R_MIN)
@@ -340,6 +341,7 @@ void HpUkfFilter::update(const float *z, const bool *mask) {
       float q_est = corr[j] * corr[j];
       if (q_est < Q_MIN)
         q_est = Q_MIN;
+      q_est *= (1.0f + em_inflation_);
       float q_old = Q_[j * dim + j];
       Q_[j * dim + j] = em_lambda_q_ * q_old + (1.0f - em_lambda_q_) * q_est;
       if (Q_[j * dim + j] < Q_MIN)

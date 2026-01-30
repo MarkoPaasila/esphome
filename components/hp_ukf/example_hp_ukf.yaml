@@ -73,6 +73,7 @@ hp_ukf:
   em_lambda_q: 0.995
   em_lambda_r_inlet: 0.998
   em_lambda_r_outlet: 0.98
+  # em_inflation: 0.5  # default: EM estimates scaled by 1.5 before smoothing (R/Q 50% larger)
   # Optional: expose tuned Q/R and lambdas as sensors (for verification/debug)
   em_q_t_out:
     name: "${name} EM Q T Out"

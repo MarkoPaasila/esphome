@@ -39,9 +39,10 @@ hp_ukf:
   outlet_humidity: hout
   track_temperature_derivatives: true
   em_autotune: true
-  em_lambda_q: 0.995
+  em_inflation: 0.5
+  em_lambda_q: 0.998
   em_lambda_r_inlet: 0.998
-  em_lambda_r_outlet: 0.98
+  em_lambda_r_outlet: 0.998
   # Optional: expose tuned Q/R and lambdas as sensors (for verification/debug)
   em_q_t_out:
     name: "${name} EM Q T Out"
@@ -74,7 +75,14 @@ climate:
       name: "Outdoor Temperature Internal"
     compressor_frequency_sensor:
       name: "Compressor frequency"
-      filters: { heartbeat: 300s }
+      filters: 
+        - heartbeat: 300s
+        - lambda: |-
+            if (x <= 4.1) {          // use <= 4.1 to catch minor float noise around 4
+              return 0.0;
+            } else {
+              return x;
+            }
     vertical_vane_select:
       name: "Vertical Vane Orientation"
     horizontal_vane_select:

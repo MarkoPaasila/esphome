@@ -37,6 +37,7 @@ CONF_EM_AUTOTUNE = "em_autotune"
 CONF_EM_LAMBDA_Q = "em_lambda_q"
 CONF_EM_LAMBDA_R_INLET = "em_lambda_r_inlet"
 CONF_EM_LAMBDA_R_OUTLET = "em_lambda_r_outlet"
+CONF_EM_INFLATION = "em_inflation"
 CONF_EM_Q_T_IN = "em_q_t_in"
 CONF_EM_Q_RH_IN = "em_q_rh_in"
 CONF_EM_Q_T_OUT = "em_q_t_out"
@@ -146,6 +147,7 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_EM_LAMBDA_Q, default=0.995): _em_lambda,
         cv.Optional(CONF_EM_LAMBDA_R_INLET, default=0.998): _em_lambda,
         cv.Optional(CONF_EM_LAMBDA_R_OUTLET, default=0.98): _em_lambda,
+        cv.Optional(CONF_EM_INFLATION, default=0.5): cv.float_range(min=0.0, max=2.0),
         cv.Optional(CONF_EM_Q_T_IN): sensor.sensor_schema(
             unit_of_measurement="°C²",
             accuracy_decimals=6,
@@ -244,6 +246,7 @@ async def to_code(config):
     cg.add(var.set_em_lambda_q(config[CONF_EM_LAMBDA_Q]))
     cg.add(var.set_em_lambda_r_inlet(config[CONF_EM_LAMBDA_R_INLET]))
     cg.add(var.set_em_lambda_r_outlet(config[CONF_EM_LAMBDA_R_OUTLET]))
+    cg.add(var.set_em_inflation(config[CONF_EM_INFLATION]))
 
     sens = await sensor.new_sensor(config[CONF_FILTERED_INLET_TEMPERATURE])
     cg.add(var.set_filtered_inlet_temperature_sensor(sens))
