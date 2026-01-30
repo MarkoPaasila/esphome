@@ -39,6 +39,27 @@ class HpUkfComponent : public PollingComponent {
     filtered_outlet_humidity_derivative_ = s;
   }
 
+  void set_em_autotune(bool v) { em_autotune_ = v; }
+  void set_em_lambda_q(float v) { em_lambda_q_ = v; }
+  void set_em_lambda_r_inlet(float v) { em_lambda_r_inlet_ = v; }
+  void set_em_lambda_r_outlet(float v) { em_lambda_r_outlet_ = v; }
+
+  void set_em_q_t_in_sensor(sensor::Sensor *s) { em_q_t_in_ = s; }
+  void set_em_q_rh_in_sensor(sensor::Sensor *s) { em_q_rh_in_ = s; }
+  void set_em_q_t_out_sensor(sensor::Sensor *s) { em_q_t_out_ = s; }
+  void set_em_q_rh_out_sensor(sensor::Sensor *s) { em_q_rh_out_ = s; }
+  void set_em_q_dt_in_sensor(sensor::Sensor *s) { em_q_dt_in_ = s; }
+  void set_em_q_dt_out_sensor(sensor::Sensor *s) { em_q_dt_out_ = s; }
+  void set_em_q_drh_in_sensor(sensor::Sensor *s) { em_q_drh_in_ = s; }
+  void set_em_q_drh_out_sensor(sensor::Sensor *s) { em_q_drh_out_ = s; }
+  void set_em_r_t_in_sensor(sensor::Sensor *s) { em_r_t_in_ = s; }
+  void set_em_r_rh_in_sensor(sensor::Sensor *s) { em_r_rh_in_ = s; }
+  void set_em_r_t_out_sensor(sensor::Sensor *s) { em_r_t_out_ = s; }
+  void set_em_r_rh_out_sensor(sensor::Sensor *s) { em_r_rh_out_ = s; }
+  void set_em_lambda_q_sensor(sensor::Sensor *s) { em_lambda_q_sensor_ = s; }
+  void set_em_lambda_r_inlet_sensor(sensor::Sensor *s) { em_lambda_r_inlet_sensor_ = s; }
+  void set_em_lambda_r_outlet_sensor(sensor::Sensor *s) { em_lambda_r_outlet_sensor_ = s; }
+
  protected:
   sensor::Sensor *inlet_temperature_{nullptr};
   sensor::Sensor *inlet_humidity_{nullptr};
@@ -54,6 +75,27 @@ class HpUkfComponent : public PollingComponent {
   sensor::Sensor *filtered_outlet_temperature_derivative_{nullptr};
   sensor::Sensor *filtered_inlet_humidity_derivative_{nullptr};
   sensor::Sensor *filtered_outlet_humidity_derivative_{nullptr};
+
+  bool em_autotune_{false};
+  float em_lambda_q_{0.995f};
+  float em_lambda_r_inlet_{0.998f};
+  float em_lambda_r_outlet_{0.98f};
+
+  sensor::Sensor *em_q_t_in_{nullptr};
+  sensor::Sensor *em_q_rh_in_{nullptr};
+  sensor::Sensor *em_q_t_out_{nullptr};
+  sensor::Sensor *em_q_rh_out_{nullptr};
+  sensor::Sensor *em_q_dt_in_{nullptr};
+  sensor::Sensor *em_q_dt_out_{nullptr};
+  sensor::Sensor *em_q_drh_in_{nullptr};
+  sensor::Sensor *em_q_drh_out_{nullptr};
+  sensor::Sensor *em_r_t_in_{nullptr};
+  sensor::Sensor *em_r_rh_in_{nullptr};
+  sensor::Sensor *em_r_t_out_{nullptr};
+  sensor::Sensor *em_r_rh_out_{nullptr};
+  sensor::Sensor *em_lambda_q_sensor_{nullptr};
+  sensor::Sensor *em_lambda_r_inlet_sensor_{nullptr};
+  sensor::Sensor *em_lambda_r_outlet_sensor_{nullptr};
 
   HpUkfFilter filter_;
   uint32_t last_update_ms_{0};

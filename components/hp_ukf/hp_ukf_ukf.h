@@ -37,12 +37,33 @@ class HpUkfFilter {
   void set_process_noise(const float *Q);
   void set_measurement_noise(const float *R);
 
+  // EM auto-tune: separate forgetting factors for Q and for R (inlet vs outlet).
+  void enable_em_autotune(bool enable) { em_enabled_ = enable; }
+  void set_em_lambda_q(float v) { em_lambda_q_ = v; }
+  void set_em_lambda_r_inlet(float v) { em_lambda_r_inlet_ = v; }
+  void set_em_lambda_r_outlet(float v) { em_lambda_r_outlet_ = v; }
+  bool em_autotune_enabled() const { return em_enabled_; }
+  float get_em_lambda_q() const { return em_lambda_q_; }
+  float get_em_lambda_r_inlet() const { return em_lambda_r_inlet_; }
+  float get_em_lambda_r_outlet() const { return em_lambda_r_outlet_; }
+
+  // Getters for diagonal Q and R (for sensor exposure). q_diag has n_ elements, r_diag has M.
+  void get_process_noise_diag(float *q_diag) const;
+  void get_measurement_noise_diag(float *r_diag) const;
+
  private:
   int n_{8};
   float x_[N_MAX]{};
   float P_[N_MAX * N_MAX]{};
   float Q_[N_MAX * N_MAX]{};
   float R_[M * M]{};
+
+  bool em_enabled_{false};
+  float em_lambda_q_{0.995f};
+  float em_lambda_r_inlet_{0.998f};
+  float em_lambda_r_outlet_{0.98f};
+  static constexpr float R_MIN = 1e-6f;
+  static constexpr float Q_MIN = 1e-10f;
 
   // UKF parameters: alpha, beta, kappa -> lambda = alpha^2 * (n + kappa) - n
   // alpha must be >= 1 (or kappa large) so lambda >= 0; else weights are invalid and P becomes non-PSD -> NaN state

@@ -42,6 +42,13 @@ void HpUkfComponent::setup() {
     P0[i * n + i] = 1.0f;
   filter_.set_initial_state(x0, P0);
 
+  if (em_autotune_) {
+    filter_.enable_em_autotune(true);
+    filter_.set_em_lambda_q(em_lambda_q_);
+    filter_.set_em_lambda_r_inlet(em_lambda_r_inlet_);
+    filter_.set_em_lambda_r_outlet(em_lambda_r_outlet_);
+  }
+
   // Publish initial state so sensors show values immediately (avoids NaN/unknown
   // before first update and when source sensors haven't reported yet).
   const float *x = filter_.get_state();
@@ -62,6 +69,39 @@ void HpUkfComponent::setup() {
       filtered_inlet_humidity_derivative_->publish_state(x[6]);
     if (filtered_outlet_humidity_derivative_)
       filtered_outlet_humidity_derivative_->publish_state(x[7]);
+  }
+
+  {
+    int em_sensor_count = (em_q_t_in_ ? 1 : 0) + (em_q_rh_in_ ? 1 : 0) + (em_q_t_out_ ? 1 : 0) + (em_q_rh_out_ ? 1 : 0)
+        + (em_r_t_in_ ? 1 : 0) + (em_r_rh_in_ ? 1 : 0) + (em_r_t_out_ ? 1 : 0) + (em_r_rh_out_ ? 1 : 0);
+    ESP_LOGI(TAG, "em_autotune=%s em_q_r_sensors=%d (Q/R only shown when both enabled and sensors configured)",
+             em_autotune_ ? "on" : "off", em_sensor_count);
+    ESP_LOGD(TAG, "setup: em_autotune=%d em_sensor_count=%d", em_autotune_ ? 1 : 0, em_sensor_count);
+  }
+  if (em_autotune_) {
+    float q_diag[HpUkfFilter::N_MAX], r_diag[HpUkfFilter::M];
+    filter_.get_process_noise_diag(q_diag);
+    filter_.get_measurement_noise_diag(r_diag);
+    ESP_LOGD(TAG, "setup Q/R diag: q[0]=%.6f q[2]=%.6f r[0]=%.6f r[2]=%.6f",
+             q_diag[0], q_diag[2], r_diag[0], r_diag[2]);
+    int n = filter_.get_state_dimension();
+    if (em_q_t_in_) em_q_t_in_->publish_state(q_diag[0]);
+    if (em_q_rh_in_) em_q_rh_in_->publish_state(q_diag[1]);
+    if (em_q_t_out_) em_q_t_out_->publish_state(q_diag[2]);
+    if (em_q_rh_out_) em_q_rh_out_->publish_state(q_diag[3]);
+    if (n >= 8) {
+      if (em_q_dt_in_) em_q_dt_in_->publish_state(q_diag[4]);
+      if (em_q_dt_out_) em_q_dt_out_->publish_state(q_diag[5]);
+      if (em_q_drh_in_) em_q_drh_in_->publish_state(q_diag[6]);
+      if (em_q_drh_out_) em_q_drh_out_->publish_state(q_diag[7]);
+    }
+    if (em_r_t_in_) em_r_t_in_->publish_state(r_diag[0]);
+    if (em_r_rh_in_) em_r_rh_in_->publish_state(r_diag[1]);
+    if (em_r_t_out_) em_r_t_out_->publish_state(r_diag[2]);
+    if (em_r_rh_out_) em_r_rh_out_->publish_state(r_diag[3]);
+    if (em_lambda_q_sensor_) em_lambda_q_sensor_->publish_state(em_lambda_q_);
+    if (em_lambda_r_inlet_sensor_) em_lambda_r_inlet_sensor_->publish_state(em_lambda_r_inlet_);
+    if (em_lambda_r_outlet_sensor_) em_lambda_r_outlet_sensor_->publish_state(em_lambda_r_outlet_);
   }
 
   last_update_ms_ = millis();
@@ -111,6 +151,37 @@ void HpUkfComponent::update() {
     if (filtered_outlet_humidity_derivative_ && std::isfinite(x[7]))
       filtered_outlet_humidity_derivative_->publish_state(x[7]);
   }
+
+  if (em_autotune_) {
+    float q_diag[HpUkfFilter::N_MAX], r_diag[HpUkfFilter::M];
+    filter_.get_process_noise_diag(q_diag);
+    filter_.get_measurement_noise_diag(r_diag);
+    static uint32_t s_update_count;
+    if (s_update_count < 3) {
+      ESP_LOGI(TAG, "update#%u Q/R: q[0]=%.6f r[0]=%.6f finite=%d %d",
+               s_update_count, q_diag[0], r_diag[0],
+               std::isfinite(q_diag[0]) ? 1 : 0, std::isfinite(r_diag[0]) ? 1 : 0);
+      s_update_count++;
+    }
+    int n = filter_.get_state_dimension();
+    if (em_q_t_in_ && std::isfinite(q_diag[0])) em_q_t_in_->publish_state(q_diag[0]);
+    if (em_q_rh_in_ && std::isfinite(q_diag[1])) em_q_rh_in_->publish_state(q_diag[1]);
+    if (em_q_t_out_ && std::isfinite(q_diag[2])) em_q_t_out_->publish_state(q_diag[2]);
+    if (em_q_rh_out_ && std::isfinite(q_diag[3])) em_q_rh_out_->publish_state(q_diag[3]);
+    if (n >= 8) {
+      if (em_q_dt_in_ && std::isfinite(q_diag[4])) em_q_dt_in_->publish_state(q_diag[4]);
+      if (em_q_dt_out_ && std::isfinite(q_diag[5])) em_q_dt_out_->publish_state(q_diag[5]);
+      if (em_q_drh_in_ && std::isfinite(q_diag[6])) em_q_drh_in_->publish_state(q_diag[6]);
+      if (em_q_drh_out_ && std::isfinite(q_diag[7])) em_q_drh_out_->publish_state(q_diag[7]);
+    }
+    if (em_r_t_in_ && std::isfinite(r_diag[0])) em_r_t_in_->publish_state(r_diag[0]);
+    if (em_r_rh_in_ && std::isfinite(r_diag[1])) em_r_rh_in_->publish_state(r_diag[1]);
+    if (em_r_t_out_ && std::isfinite(r_diag[2])) em_r_t_out_->publish_state(r_diag[2]);
+    if (em_r_rh_out_ && std::isfinite(r_diag[3])) em_r_rh_out_->publish_state(r_diag[3]);
+    if (em_lambda_q_sensor_) em_lambda_q_sensor_->publish_state(em_lambda_q_);
+    if (em_lambda_r_inlet_sensor_) em_lambda_r_inlet_sensor_->publish_state(em_lambda_r_inlet_);
+    if (em_lambda_r_outlet_sensor_) em_lambda_r_outlet_sensor_->publish_state(em_lambda_r_outlet_);
+  }
 }
 
 void HpUkfComponent::dump_config() {
@@ -122,6 +193,14 @@ void HpUkfComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "  Inlet humidity sensor: %s", inlet_humidity_ ? "set" : "not set");
   ESP_LOGCONFIG(TAG, "  Outlet temperature sensor: %s", outlet_temperature_ ? "set" : "not set");
   ESP_LOGCONFIG(TAG, "  Outlet humidity sensor: %s", outlet_humidity_ ? "set" : "not set");
+  ESP_LOGCONFIG(TAG, "  EM auto-tune: %s", em_autotune_ ? "enabled" : "disabled");
+  if (em_autotune_) {
+    ESP_LOGCONFIG(TAG, "  EM lambda_q=%.3f, lambda_r_inlet=%.3f, lambda_r_outlet=%.3f",
+                  em_lambda_q_, em_lambda_r_inlet_, em_lambda_r_outlet_);
+    int em_sensors = (em_q_t_in_ ? 1 : 0) + (em_q_rh_in_ ? 1 : 0) + (em_q_t_out_ ? 1 : 0) + (em_q_rh_out_ ? 1 : 0)
+        + (em_r_t_in_ ? 1 : 0) + (em_r_rh_in_ ? 1 : 0) + (em_r_t_out_ ? 1 : 0) + (em_r_rh_out_ ? 1 : 0);
+    ESP_LOGCONFIG(TAG, "  EM Q/R sensors configured: %d", em_sensors);
+  }
 }
 
 }  // namespace hp_ukf

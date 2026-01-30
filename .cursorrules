@@ -89,6 +89,7 @@ ESP_LOGV(TAG, "Byte received: 0x%02X", byte);
 - Use `std::vector<>` for dynamic arrays
 - Avoid `new`/`delete`, use smart pointers
 - Be mindful of SRAM limitations (ESP8266: ~40KB, ESP32: ~320KB)
+- Use single-precision **float** or integers only—no **double**. Use `1.0f`-style literals for float; avoid bare `1.0` when the value is used as float (it is double in C++).
 
 ### Timing and Delays
 - NEVER use `delay()` in `loop()` - blocks entire system

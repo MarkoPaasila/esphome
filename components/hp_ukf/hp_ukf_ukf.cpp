@@ -64,6 +64,16 @@ void HpUkfFilter::set_measurement_noise(const float *R) {
     R_[i] = R[i];
 }
 
+void HpUkfFilter::get_process_noise_diag(float *q_diag) const {
+  for (int i = 0; i < n_; i++)
+    q_diag[i] = Q_[i * n_ + i];
+}
+
+void HpUkfFilter::get_measurement_noise_diag(float *r_diag) const {
+  for (int i = 0; i < M; i++)
+    r_diag[i] = R_[i * M + i];
+}
+
 void HpUkfFilter::state_transition(const float *x_in, float dt, float *x_out) const {
   x_out[0] = x_in[0] + (n_ >= 8 ? x_in[4] * dt : 0.0f);   // T_in
   x_out[1] = x_in[1] + (n_ >= 8 ? x_in[6] * dt : 0.0f);   // RH_in
@@ -197,6 +207,10 @@ void HpUkfFilter::update(const float *z, const bool *mask) {
       for (int j = 0; j < m_avail; j++)
         Pzz[i * m_avail + j] += w * dz[i] * dz[j];
   }
+  // Save Pzz prior (before adding R) for EM R adaptation.
+  float Pzz_prior_ii[4];
+  for (int i = 0; i < m_avail; i++)
+    Pzz_prior_ii[i] = Pzz[i * m_avail + i];
   for (int i = 0; i < m_avail; i++)
     Pzz[i * m_avail + i] += R_[idx[i] * M + idx[i]];
 
@@ -268,10 +282,12 @@ void HpUkfFilter::update(const float *z, const bool *mask) {
   float innov[4];
   for (int i = 0; i < m_avail; i++)
     innov[i] = z_avail[i] - z_pred_avail[i];
+  float corr[N_MAX];
   for (int i = 0; i < dim; i++) {
     float dx = 0.0f;
     for (int j = 0; j < m_avail; j++)
       dx += K[i * m_avail + j] * innov[j];
+    corr[i] = dx;
     x_[i] += dx;
   }
 
@@ -306,6 +322,30 @@ void HpUkfFilter::update(const float *z, const bool *mask) {
           KRK += K[i * m_avail + r] * R_[idx[r] * M + idx[s]] * K[j * m_avail + s];
       P_[i * dim + j] = P_tmp[i * dim + j] + KRK;
     }
+
+  // EM auto-tune: R adaptation then Q adaptation (diagonal, with forgetting factors).
+  if (em_enabled_) {
+    for (int i = 0; i < m_avail; i++) {
+      int g = idx[i];
+      float lambda_r = (g <= 1) ? em_lambda_r_inlet_ : em_lambda_r_outlet_;
+      float r_est = innov[i] * innov[i] - Pzz_prior_ii[i];
+      if (r_est < R_MIN)
+        r_est = R_MIN;
+      float r_old = R_[g * M + g];
+      R_[g * M + g] = lambda_r * r_old + (1.0f - lambda_r) * r_est;
+      if (R_[g * M + g] < R_MIN)
+        R_[g * M + g] = R_MIN;
+    }
+    for (int j = 0; j < dim; j++) {
+      float q_est = corr[j] * corr[j];
+      if (q_est < Q_MIN)
+        q_est = Q_MIN;
+      float q_old = Q_[j * dim + j];
+      Q_[j * dim + j] = em_lambda_q_ * q_old + (1.0f - em_lambda_q_) * q_est;
+      if (Q_[j * dim + j] < Q_MIN)
+        Q_[j * dim + j] = Q_MIN;
+    }
+  }
 }
 
 }  // namespace hp_ukf

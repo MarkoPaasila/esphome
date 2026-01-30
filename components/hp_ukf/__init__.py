@@ -33,6 +33,33 @@ CONF_FILTERED_INLET_TEMPERATURE_DERIVATIVE = "filtered_inlet_temperature_derivat
 CONF_FILTERED_OUTLET_TEMPERATURE_DERIVATIVE = "filtered_outlet_temperature_derivative"
 CONF_FILTERED_INLET_HUMIDITY_DERIVATIVE = "filtered_inlet_humidity_derivative"
 CONF_FILTERED_OUTLET_HUMIDITY_DERIVATIVE = "filtered_outlet_humidity_derivative"
+CONF_EM_AUTOTUNE = "em_autotune"
+CONF_EM_LAMBDA_Q = "em_lambda_q"
+CONF_EM_LAMBDA_R_INLET = "em_lambda_r_inlet"
+CONF_EM_LAMBDA_R_OUTLET = "em_lambda_r_outlet"
+CONF_EM_Q_T_IN = "em_q_t_in"
+CONF_EM_Q_RH_IN = "em_q_rh_in"
+CONF_EM_Q_T_OUT = "em_q_t_out"
+CONF_EM_Q_RH_OUT = "em_q_rh_out"
+CONF_EM_Q_DT_IN = "em_q_dt_in"
+CONF_EM_Q_DT_OUT = "em_q_dt_out"
+CONF_EM_Q_DRH_IN = "em_q_drh_in"
+CONF_EM_Q_DRH_OUT = "em_q_drh_out"
+CONF_EM_R_T_IN = "em_r_t_in"
+CONF_EM_R_RH_IN = "em_r_rh_in"
+CONF_EM_R_T_OUT = "em_r_t_out"
+CONF_EM_R_RH_OUT = "em_r_rh_out"
+CONF_EM_LAMBDA_Q_SENSOR = "em_lambda_q_sensor"
+CONF_EM_LAMBDA_R_INLET_SENSOR = "em_lambda_r_inlet_sensor"
+CONF_EM_LAMBDA_R_OUTLET_SENSOR = "em_lambda_r_outlet_sensor"
+
+
+def _em_lambda(value):
+    v = float(value)
+    if v <= 0 or v > 1:
+        raise cv.Invalid("lambda must be in (0, 1]")
+    return v
+
 
 CONFIG_SCHEMA = cv.Schema(
     {
@@ -115,6 +142,82 @@ CONFIG_SCHEMA = cv.Schema(
             device_class=DEVICE_CLASS_HUMIDITY,
             state_class=STATE_CLASS_MEASUREMENT,
         ),
+        cv.Optional(CONF_EM_AUTOTUNE, default=False): cv.boolean,
+        cv.Optional(CONF_EM_LAMBDA_Q, default=0.995): _em_lambda,
+        cv.Optional(CONF_EM_LAMBDA_R_INLET, default=0.998): _em_lambda,
+        cv.Optional(CONF_EM_LAMBDA_R_OUTLET, default=0.98): _em_lambda,
+        cv.Optional(CONF_EM_Q_T_IN): sensor.sensor_schema(
+            unit_of_measurement="°C²",
+            accuracy_decimals=6,
+            state_class=STATE_CLASS_MEASUREMENT,
+        ),
+        cv.Optional(CONF_EM_Q_RH_IN): sensor.sensor_schema(
+            unit_of_measurement="%²",
+            accuracy_decimals=6,
+            state_class=STATE_CLASS_MEASUREMENT,
+        ),
+        cv.Optional(CONF_EM_Q_T_OUT): sensor.sensor_schema(
+            unit_of_measurement="°C²",
+            accuracy_decimals=6,
+            state_class=STATE_CLASS_MEASUREMENT,
+        ),
+        cv.Optional(CONF_EM_Q_RH_OUT): sensor.sensor_schema(
+            unit_of_measurement="%²",
+            accuracy_decimals=6,
+            state_class=STATE_CLASS_MEASUREMENT,
+        ),
+        cv.Optional(CONF_EM_Q_DT_IN): sensor.sensor_schema(
+            unit_of_measurement="(°C/s)²",
+            accuracy_decimals=6,
+            state_class=STATE_CLASS_MEASUREMENT,
+        ),
+        cv.Optional(CONF_EM_Q_DT_OUT): sensor.sensor_schema(
+            unit_of_measurement="(°C/s)²",
+            accuracy_decimals=6,
+            state_class=STATE_CLASS_MEASUREMENT,
+        ),
+        cv.Optional(CONF_EM_Q_DRH_IN): sensor.sensor_schema(
+            unit_of_measurement="(%/s)²",
+            accuracy_decimals=6,
+            state_class=STATE_CLASS_MEASUREMENT,
+        ),
+        cv.Optional(CONF_EM_Q_DRH_OUT): sensor.sensor_schema(
+            unit_of_measurement="(%/s)²",
+            accuracy_decimals=6,
+            state_class=STATE_CLASS_MEASUREMENT,
+        ),
+        cv.Optional(CONF_EM_R_T_IN): sensor.sensor_schema(
+            unit_of_measurement="°C²",
+            accuracy_decimals=6,
+            state_class=STATE_CLASS_MEASUREMENT,
+        ),
+        cv.Optional(CONF_EM_R_RH_IN): sensor.sensor_schema(
+            unit_of_measurement="%²",
+            accuracy_decimals=6,
+            state_class=STATE_CLASS_MEASUREMENT,
+        ),
+        cv.Optional(CONF_EM_R_T_OUT): sensor.sensor_schema(
+            unit_of_measurement="°C²",
+            accuracy_decimals=6,
+            state_class=STATE_CLASS_MEASUREMENT,
+        ),
+        cv.Optional(CONF_EM_R_RH_OUT): sensor.sensor_schema(
+            unit_of_measurement="%²",
+            accuracy_decimals=6,
+            state_class=STATE_CLASS_MEASUREMENT,
+        ),
+        cv.Optional(CONF_EM_LAMBDA_Q_SENSOR): sensor.sensor_schema(
+            accuracy_decimals=3,
+            state_class=STATE_CLASS_MEASUREMENT,
+        ),
+        cv.Optional(CONF_EM_LAMBDA_R_INLET_SENSOR): sensor.sensor_schema(
+            accuracy_decimals=3,
+            state_class=STATE_CLASS_MEASUREMENT,
+        ),
+        cv.Optional(CONF_EM_LAMBDA_R_OUTLET_SENSOR): sensor.sensor_schema(
+            accuracy_decimals=3,
+            state_class=STATE_CLASS_MEASUREMENT,
+        ),
     }
 ).extend(cv.COMPONENT_SCHEMA)
 
@@ -137,6 +240,11 @@ async def to_code(config):
         sens = await cg.get_variable(config[CONF_OUTLET_HUMIDITY])
         cg.add(var.set_outlet_humidity_sensor(sens))
 
+    cg.add(var.set_em_autotune(config[CONF_EM_AUTOTUNE]))
+    cg.add(var.set_em_lambda_q(config[CONF_EM_LAMBDA_Q]))
+    cg.add(var.set_em_lambda_r_inlet(config[CONF_EM_LAMBDA_R_INLET]))
+    cg.add(var.set_em_lambda_r_outlet(config[CONF_EM_LAMBDA_R_OUTLET]))
+
     sens = await sensor.new_sensor(config[CONF_FILTERED_INLET_TEMPERATURE])
     cg.add(var.set_filtered_inlet_temperature_sensor(sens))
     sens = await sensor.new_sensor(config[CONF_FILTERED_INLET_HUMIDITY])
@@ -153,3 +261,49 @@ async def to_code(config):
     cg.add(var.set_filtered_inlet_humidity_derivative_sensor(sens))
     sens = await sensor.new_sensor(config[CONF_FILTERED_OUTLET_HUMIDITY_DERIVATIVE])
     cg.add(var.set_filtered_outlet_humidity_derivative_sensor(sens))
+
+    if CONF_EM_Q_T_IN in config:
+        sens = await sensor.new_sensor(config[CONF_EM_Q_T_IN])
+        cg.add(var.set_em_q_t_in_sensor(sens))
+    if CONF_EM_Q_RH_IN in config:
+        sens = await sensor.new_sensor(config[CONF_EM_Q_RH_IN])
+        cg.add(var.set_em_q_rh_in_sensor(sens))
+    if CONF_EM_Q_T_OUT in config:
+        sens = await sensor.new_sensor(config[CONF_EM_Q_T_OUT])
+        cg.add(var.set_em_q_t_out_sensor(sens))
+    if CONF_EM_Q_RH_OUT in config:
+        sens = await sensor.new_sensor(config[CONF_EM_Q_RH_OUT])
+        cg.add(var.set_em_q_rh_out_sensor(sens))
+    if CONF_EM_Q_DT_IN in config:
+        sens = await sensor.new_sensor(config[CONF_EM_Q_DT_IN])
+        cg.add(var.set_em_q_dt_in_sensor(sens))
+    if CONF_EM_Q_DT_OUT in config:
+        sens = await sensor.new_sensor(config[CONF_EM_Q_DT_OUT])
+        cg.add(var.set_em_q_dt_out_sensor(sens))
+    if CONF_EM_Q_DRH_IN in config:
+        sens = await sensor.new_sensor(config[CONF_EM_Q_DRH_IN])
+        cg.add(var.set_em_q_drh_in_sensor(sens))
+    if CONF_EM_Q_DRH_OUT in config:
+        sens = await sensor.new_sensor(config[CONF_EM_Q_DRH_OUT])
+        cg.add(var.set_em_q_drh_out_sensor(sens))
+    if CONF_EM_R_T_IN in config:
+        sens = await sensor.new_sensor(config[CONF_EM_R_T_IN])
+        cg.add(var.set_em_r_t_in_sensor(sens))
+    if CONF_EM_R_RH_IN in config:
+        sens = await sensor.new_sensor(config[CONF_EM_R_RH_IN])
+        cg.add(var.set_em_r_rh_in_sensor(sens))
+    if CONF_EM_R_T_OUT in config:
+        sens = await sensor.new_sensor(config[CONF_EM_R_T_OUT])
+        cg.add(var.set_em_r_t_out_sensor(sens))
+    if CONF_EM_R_RH_OUT in config:
+        sens = await sensor.new_sensor(config[CONF_EM_R_RH_OUT])
+        cg.add(var.set_em_r_rh_out_sensor(sens))
+    if CONF_EM_LAMBDA_Q_SENSOR in config:
+        sens = await sensor.new_sensor(config[CONF_EM_LAMBDA_Q_SENSOR])
+        cg.add(var.set_em_lambda_q_sensor(sens))
+    if CONF_EM_LAMBDA_R_INLET_SENSOR in config:
+        sens = await sensor.new_sensor(config[CONF_EM_LAMBDA_R_INLET_SENSOR])
+        cg.add(var.set_em_lambda_r_inlet_sensor(sens))
+    if CONF_EM_LAMBDA_R_OUTLET_SENSOR in config:
+        sens = await sensor.new_sensor(config[CONF_EM_LAMBDA_R_OUTLET_SENSOR])
+        cg.add(var.set_em_lambda_r_outlet_sensor(sens))

@@ -59,6 +59,8 @@ sensor:
       return 45.0f;
 
 # HP-UKF component: user provides the four sensors; UKF runs at update_interval.
+# Optional: EM auto-tune adapts process (Q) and measurement (R) noise with
+# separate forgetting factors for inlet (slower) vs outlet (faster dynamics).
 hp_ukf:
   id: hp_ukf
   update_interval: 1s
@@ -67,7 +69,17 @@ hp_ukf:
   outlet_temperature: outlet_temperature
   outlet_humidity: outlet_humidity
   track_temperature_derivatives: true
+  em_autotune: true
+  em_lambda_q: 0.995
+  em_lambda_r_inlet: 0.998
+  em_lambda_r_outlet: 0.98
+  # Optional: expose tuned Q/R and lambdas as sensors (for verification/debug)
+  em_q_t_out:
+    name: "${name} EM Q T Out"
+  em_r_t_out:
+    name: "${name} EM R T Out"
 
 # The component exposes: Filtered Inlet/Outlet Temperature and Humidity,
 # and (if track_temperature_derivatives is true) Filtered Inlet/Outlet
 # Temperature Derivative (°C/s) and Filtered Inlet/Outlet Humidity Derivative (%/s).
+# With em_autotune, optional sensors for Q/R diagonals and lambdas can be added.
