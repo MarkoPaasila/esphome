@@ -71,6 +71,8 @@ sensor:
 
 # HP-UKF component: user provides the four sensors; UKF runs at update_interval.
 # Optional: air_flow (L/s) adds air flow and delivered power to UKF state.
+# Optional: climate + compressor_frequency (e.g. Mitsubishi CN105) use action and
+# compressor Hz as control inputs so delivered_power is forced to 0 when OFF/IDLE.
 # Optional: EM auto-tune adapts process (Q) and measurement (R) noise with
 # separate forgetting factors for inlet (slower) vs outlet (faster dynamics).
 hp_ukf:
@@ -82,6 +84,11 @@ hp_ukf:
   outlet_humidity: outlet_humidity
   # Optional: air flow sensor in L/s; enables filtered_air_flow and delivered_power
   air_flow: air_flow
+  # Optional: with MitsubishiCN105ESPHome, reference climate, compressor sensor, and power sensor
+  # (give compressor_frequency_sensor and input_power_sensor ids in the climate block)
+  # climate: hp
+  # compressor_frequency: compressor_freq
+  # power_sensor: hp_power   # input power in W; correlated to compressor speed
   filtered_air_flow:
     name: "${name} Filtered Air Flow"
   delivered_power:

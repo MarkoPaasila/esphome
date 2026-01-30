@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 namespace esphome {
 namespace hp_ukf {
 
@@ -31,6 +33,11 @@ class HpUkfFilter {
 
   // Time-discrete predict with elapsed time dt in seconds.
   void predict(float dt);
+
+  // Control input: set before predict(). action: 0=OFF, 2=COOLING, 3=HEATING, 4=IDLE, 5=DRYING, 6=FAN (matches ClimateAction).
+  // compressor_freq_hz: Hz or 0/NaN when unknown. power_kw: input power in kW (NaN when not configured); correlated to compressor speed.
+  // Used in state_transition (e.g. force delivered_power=0 when OFF/IDLE, compressor 0, or power near 0).
+  void set_control_input(uint8_t action, float compressor_freq_hz, float power_kw);
 
   // Update with measurement z[M] and mask (true = measurement available).
   void update(const float *z, const bool *mask);
@@ -85,6 +92,10 @@ class HpUkfFilter {
   float wc_{0.0f};
 
   float pressure_pa_{101325.0f};
+
+  uint8_t control_action_{0};
+  float control_compressor_hz_{0.0f};
+  float control_power_kw_{0.0f};  // NaN when not configured
 
   void update_weights();
   void state_transition(const float *x_in, float dt, float *x_out) const;

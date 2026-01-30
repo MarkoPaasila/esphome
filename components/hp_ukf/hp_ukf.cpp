@@ -2,6 +2,8 @@
 #include "esphome/core/application.h"
 #include "esphome/core/component.h"
 #include "esphome/core/log.h"
+#include "esphome/components/climate/climate.h"
+#include "esphome/components/climate/climate_mode.h"
 #include <cmath>
 #include <algorithm>
 #ifdef USE_ESP32
@@ -272,6 +274,24 @@ void HpUkfComponent::update() {
   float dt_s = (now_ms - last_update_ms_) / 1000.0f;
   dt_s = std::max(1e-6f, std::min(dt_s, 3600.0f));
 
+  uint8_t action = 0;
+  float compressor_hz = 0.0f;
+  float power_kw = NAN;
+  if (climate_ != nullptr) {
+    action = static_cast<uint8_t>(climate_->action);
+  }
+  if (compressor_frequency_ != nullptr && compressor_frequency_->has_state()) {
+    float v = compressor_frequency_->get_state();
+    compressor_hz = std::isfinite(v) ? v : 0.0f;
+  }
+  if (power_sensor_ != nullptr && power_sensor_->has_state()) {
+    float w = power_sensor_->get_state();
+    if (std::isfinite(w) && w >= 0.0f) {
+      power_kw = w / 1000.0f;  // sensor in W -> kW
+    }
+  }
+  filter_.set_control_input(action, compressor_hz, power_kw);
+
   filter_.predict(dt_s);
   uint32_t t_after_predict_us = micros();
 
@@ -400,6 +420,9 @@ void HpUkfComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "  Outlet temperature sensor: %s", outlet_temperature_ ? "set" : "not set");
   ESP_LOGCONFIG(TAG, "  Outlet humidity sensor: %s", outlet_humidity_ ? "set" : "not set");
   ESP_LOGCONFIG(TAG, "  Air flow sensor (L/s): %s", air_flow_ ? "set" : "not set");
+  ESP_LOGCONFIG(TAG, "  Climate (action input): %s", climate_ ? "set" : "not set");
+  ESP_LOGCONFIG(TAG, "  Compressor frequency sensor (Hz): %s", compressor_frequency_ ? "set" : "not set");
+  ESP_LOGCONFIG(TAG, "  Power sensor (W, control input): %s", power_sensor_ ? "set" : "not set");
   ESP_LOGCONFIG(TAG, "  Atmospheric pressure: %.2f hPa", pressure_pa_ / 100.0f);
   ESP_LOGCONFIG(TAG, "  EM auto-tune: %s", em_autotune_ ? "enabled" : "disabled");
   if (em_autotune_) {
