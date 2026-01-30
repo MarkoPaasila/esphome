@@ -1,9 +1,13 @@
 substitutions:
   name: "fd25"
   dallas_pin: '19'
+  dallas_address_heat_exchanger_temp: '0xa4b32d851e64ff28'
+  dallas_address_outdoor_temp:        '0x00ca55851e64ff28'
 
 esp32:
   variant: ESP32
+  framework:
+    type: esp-idf
 
 
 esphome:
@@ -41,6 +45,11 @@ hp_ukf:
   air_flow: vol
   compressor_frequency: compressor_freq
   power_sensor: power
+  outside_temperature: outdoor_temp
+  outside_coil_temperature_after: heat_exchanger_temp
+  inside_room_temperature: indoor_temp
+  inside_room_humidity: indoor_humidity
+  # atmospheric_pressure: atmospheric_pressure
   track_temperature_derivatives: true
   em_autotune: true
   em_inflation: 1.0
@@ -155,6 +164,29 @@ sensor:
       id: tout
     humidity:
       id: hout
+  - name: "Outdoor unit heat exchanger temperature"
+    platform: dallas_temp
+    address: $dallas_address_heat_exchanger_temp # Remember to define this on platform.yaml
+    id: heat_exchanger_temp
+    accuracy_decimals: 1
+    device_class: temperature
+    state_class: measurement
+  - name: "Outdoor temperature"
+    platform: dallas_temp
+    address: $dallas_address_outdoor_temp # Remember to define this on platform.yaml
+    id: outdoor_temp
+    accuracy_decimals: 1
+    device_class: temperature
+    state_class: measurement
+  - id: indoor_temp
+    platform: homeassistant
+    entity_id: sensor.bme280_1_bme280_temperature
+  - id: indoor_humidity
+    platform: homeassistant
+    entity_id: sensor.bme280_1_bme280_humidity
+  - id: atmospheric_pressure
+    platform: homeassistant
+    entity_id: sensor.bme280_1_bme280_pressure
 
   - name: "Air Volume"
     platform: template

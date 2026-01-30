@@ -119,10 +119,17 @@ void HpUkfFilter::get_measurement_noise_diag(float *r_diag) const {
     r_diag[i] = R_[i * M + i];
 }
 
-void HpUkfFilter::set_control_input(uint8_t action, float compressor_freq_hz, float power_kw) {
+void HpUkfFilter::set_control_input(uint8_t action, float compressor_freq_hz, float power_kw,
+                                    float T_outside, float T_coil_before, float T_coil_after,
+                                    float T_room, float rh_room) {
   control_action_ = action;
   control_compressor_hz_ = compressor_freq_hz;
   control_power_kw_ = power_kw;
+  control_T_outside_ = T_outside;
+  control_T_coil_before_ = T_coil_before;
+  control_T_coil_after_ = T_coil_after;
+  control_T_room_ = T_room;
+  control_rh_room_ = rh_room;
 }
 
 // Threshold below which input power (kW) is treated as "no power" (correlated to compressor off).

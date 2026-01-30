@@ -290,7 +290,13 @@ void HpUkfComponent::update() {
       power_kw = w / 1000.0f;  // sensor in W -> kW
     }
   }
-  filter_.set_control_input(action, compressor_hz, power_kw);
+  float T_outside = read_sensor(outside_temperature_);
+  float T_coil_before = read_sensor(outside_coil_temperature_before_);
+  float T_coil_after = read_sensor(outside_coil_temperature_after_);
+  float T_room = read_sensor(inside_room_temperature_);
+  float rh_room = read_sensor(inside_room_humidity_);
+  filter_.set_control_input(action, compressor_hz, power_kw, T_outside, T_coil_before, T_coil_after,
+                            T_room, rh_room);
 
   filter_.predict(dt_s);
   uint32_t t_after_predict_us = micros();
