@@ -39,7 +39,7 @@ hp_ukf:
   outlet_humidity: hout
   track_temperature_derivatives: true
   em_autotune: true
-  em_inflation: 0.5
+  em_inflation: 1.0
   em_lambda_q: 0.998
   em_lambda_r_inlet: 0.998
   em_lambda_r_outlet: 0.998
@@ -60,6 +60,18 @@ hp_ukf:
     name: "${name} EM Q RH Out"
   em_r_rh_out:
     name: "${name} EM R RH Out"
+  inlet_absolute_humidity:
+    name: "${name} Inlet Absolute Humidity"
+  inlet_dew_point:
+    name: "${name} Inlet Dew Point"
+  inlet_enthalpy:
+    name: "${name} Inlet Enthalpy"
+  outlet_absolute_humidity:
+    name: "${name} Outlet Absolute Humidity"
+  outlet_dew_point:
+    name: "${name} Outlet Dew Point"
+  outlet_enthalpy:
+    name: "${name} Outlet Enthalpy"
 
 climate:
   - platform: cn105

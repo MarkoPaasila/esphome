@@ -53,6 +53,15 @@ CONF_EM_R_RH_OUT = "em_r_rh_out"
 CONF_EM_LAMBDA_Q_SENSOR = "em_lambda_q_sensor"
 CONF_EM_LAMBDA_R_INLET_SENSOR = "em_lambda_r_inlet_sensor"
 CONF_EM_LAMBDA_R_OUTLET_SENSOR = "em_lambda_r_outlet_sensor"
+CONF_ATMOSPHERIC_PRESSURE = "atmospheric_pressure"
+CONF_INLET_ABSOLUTE_HUMIDITY = "inlet_absolute_humidity"
+CONF_INLET_DEW_POINT = "inlet_dew_point"
+CONF_INLET_ENTHALPY = "inlet_enthalpy"
+CONF_INLET_HUMIDITY_RATIO = "inlet_humidity_ratio"
+CONF_OUTLET_ABSOLUTE_HUMIDITY = "outlet_absolute_humidity"
+CONF_OUTLET_DEW_POINT = "outlet_dew_point"
+CONF_OUTLET_ENTHALPY = "outlet_enthalpy"
+CONF_OUTLET_HUMIDITY_RATIO = "outlet_humidity_ratio"
 
 
 def _em_lambda(value):
@@ -143,6 +152,7 @@ CONFIG_SCHEMA = cv.Schema(
             device_class=DEVICE_CLASS_HUMIDITY,
             state_class=STATE_CLASS_MEASUREMENT,
         ),
+        cv.Optional(CONF_ATMOSPHERIC_PRESSURE, default=1013.25): cv.float_range(min=10.0, max=1200.0),
         cv.Optional(CONF_EM_AUTOTUNE, default=False): cv.boolean,
         cv.Optional(CONF_EM_LAMBDA_Q, default=0.995): _em_lambda,
         cv.Optional(CONF_EM_LAMBDA_R_INLET, default=0.998): _em_lambda,
@@ -220,6 +230,52 @@ CONFIG_SCHEMA = cv.Schema(
             accuracy_decimals=3,
             state_class=STATE_CLASS_MEASUREMENT,
         ),
+        cv.Optional(CONF_INLET_ABSOLUTE_HUMIDITY): sensor.sensor_schema(
+            unit_of_measurement="g/m³",
+            accuracy_decimals=2,
+            device_class=DEVICE_CLASS_HUMIDITY,
+            state_class=STATE_CLASS_MEASUREMENT,
+        ),
+        cv.Optional(CONF_INLET_DEW_POINT): sensor.sensor_schema(
+            unit_of_measurement=UNIT_CELSIUS,
+            accuracy_decimals=2,
+            device_class=DEVICE_CLASS_TEMPERATURE,
+            state_class=STATE_CLASS_MEASUREMENT,
+        ),
+        cv.Optional(CONF_INLET_ENTHALPY): sensor.sensor_schema(
+            unit_of_measurement="kJ/kg",
+            accuracy_decimals=2,
+            state_class=STATE_CLASS_MEASUREMENT,
+        ),
+        cv.Optional(CONF_INLET_HUMIDITY_RATIO): sensor.sensor_schema(
+            unit_of_measurement="g/kg",
+            accuracy_decimals=2,
+            device_class=DEVICE_CLASS_HUMIDITY,
+            state_class=STATE_CLASS_MEASUREMENT,
+        ),
+        cv.Optional(CONF_OUTLET_ABSOLUTE_HUMIDITY): sensor.sensor_schema(
+            unit_of_measurement="g/m³",
+            accuracy_decimals=2,
+            device_class=DEVICE_CLASS_HUMIDITY,
+            state_class=STATE_CLASS_MEASUREMENT,
+        ),
+        cv.Optional(CONF_OUTLET_DEW_POINT): sensor.sensor_schema(
+            unit_of_measurement=UNIT_CELSIUS,
+            accuracy_decimals=2,
+            device_class=DEVICE_CLASS_TEMPERATURE,
+            state_class=STATE_CLASS_MEASUREMENT,
+        ),
+        cv.Optional(CONF_OUTLET_ENTHALPY): sensor.sensor_schema(
+            unit_of_measurement="kJ/kg",
+            accuracy_decimals=2,
+            state_class=STATE_CLASS_MEASUREMENT,
+        ),
+        cv.Optional(CONF_OUTLET_HUMIDITY_RATIO): sensor.sensor_schema(
+            unit_of_measurement="g/kg",
+            accuracy_decimals=2,
+            device_class=DEVICE_CLASS_HUMIDITY,
+            state_class=STATE_CLASS_MEASUREMENT,
+        ),
     }
 ).extend(cv.COMPONENT_SCHEMA)
 
@@ -247,6 +303,7 @@ async def to_code(config):
     cg.add(var.set_em_lambda_r_inlet(config[CONF_EM_LAMBDA_R_INLET]))
     cg.add(var.set_em_lambda_r_outlet(config[CONF_EM_LAMBDA_R_OUTLET]))
     cg.add(var.set_em_inflation(config[CONF_EM_INFLATION]))
+    cg.add(var.set_atmospheric_pressure(config[CONF_ATMOSPHERIC_PRESSURE] * 100.0))
 
     sens = await sensor.new_sensor(config[CONF_FILTERED_INLET_TEMPERATURE])
     cg.add(var.set_filtered_inlet_temperature_sensor(sens))
@@ -310,3 +367,27 @@ async def to_code(config):
     if CONF_EM_LAMBDA_R_OUTLET_SENSOR in config:
         sens = await sensor.new_sensor(config[CONF_EM_LAMBDA_R_OUTLET_SENSOR])
         cg.add(var.set_em_lambda_r_outlet_sensor(sens))
+    if CONF_INLET_ABSOLUTE_HUMIDITY in config:
+        sens = await sensor.new_sensor(config[CONF_INLET_ABSOLUTE_HUMIDITY])
+        cg.add(var.set_inlet_absolute_humidity_sensor(sens))
+    if CONF_INLET_DEW_POINT in config:
+        sens = await sensor.new_sensor(config[CONF_INLET_DEW_POINT])
+        cg.add(var.set_inlet_dew_point_sensor(sens))
+    if CONF_INLET_ENTHALPY in config:
+        sens = await sensor.new_sensor(config[CONF_INLET_ENTHALPY])
+        cg.add(var.set_inlet_enthalpy_sensor(sens))
+    if CONF_INLET_HUMIDITY_RATIO in config:
+        sens = await sensor.new_sensor(config[CONF_INLET_HUMIDITY_RATIO])
+        cg.add(var.set_inlet_humidity_ratio_sensor(sens))
+    if CONF_OUTLET_ABSOLUTE_HUMIDITY in config:
+        sens = await sensor.new_sensor(config[CONF_OUTLET_ABSOLUTE_HUMIDITY])
+        cg.add(var.set_outlet_absolute_humidity_sensor(sens))
+    if CONF_OUTLET_DEW_POINT in config:
+        sens = await sensor.new_sensor(config[CONF_OUTLET_DEW_POINT])
+        cg.add(var.set_outlet_dew_point_sensor(sens))
+    if CONF_OUTLET_ENTHALPY in config:
+        sens = await sensor.new_sensor(config[CONF_OUTLET_ENTHALPY])
+        cg.add(var.set_outlet_enthalpy_sensor(sens))
+    if CONF_OUTLET_HUMIDITY_RATIO in config:
+        sens = await sensor.new_sensor(config[CONF_OUTLET_HUMIDITY_RATIO])
+        cg.add(var.set_outlet_humidity_ratio_sensor(sens))

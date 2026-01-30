@@ -32,6 +32,75 @@ static float read_sensor(sensor::Sensor *s) {
   return NAN;
 }
 
+// Psychrometric helpers (Magnus over water, T in °C, pressures in Pa). Single precision only.
+static float saturation_vapor_pressure_pa(float T_c) {
+  float denom = 243.04f + T_c;
+  if (denom < 1.0f)
+    denom = 1.0f;
+  return 610.94f * expf(17.625f * T_c / denom);
+}
+
+static float partial_pressure_vapor(float T_c, float rh) {
+  return (rh / 100.0f) * saturation_vapor_pressure_pa(T_c);
+}
+
+static float absolute_humidity_g_m3(float T_c, float pv_pa) {
+  float T_k = T_c + 273.15f;
+  if (T_k < 1.0f)
+    T_k = 1.0f;
+  return 1000.0f * pv_pa / (461.495f * T_k);
+}
+
+static float dew_point_c(float pv_pa) {
+  if (pv_pa <= 1.0f)
+    return NAN;
+  float ln_pv = logf(pv_pa / 610.94f);
+  float denom = 17.625f - ln_pv;
+  if (denom < 0.1f)
+    denom = 0.1f;
+  return 243.04f * ln_pv / denom;
+}
+
+static float humidity_ratio_kg_kg(float pv_pa, float p_pa) {
+  float p_minus_pv = p_pa - pv_pa;
+  if (p_minus_pv < 10.0f)
+    return NAN;
+  return 0.62198f * pv_pa / p_minus_pv;
+}
+
+static float enthalpy_kj_kg(float T_c, float W_kg_kg) {
+  return 1.006f * T_c + W_kg_kg * (2501.0f + 1.86f * T_c);
+}
+
+static void publish_psychrometric(float T_c, float rh, float p_pa,
+                                  sensor::Sensor *abs_hum, sensor::Sensor *dew, sensor::Sensor *enthalpy,
+                                  sensor::Sensor *hum_ratio) {
+  if (!std::isfinite(T_c) || !std::isfinite(rh))
+    return;
+  float p_sat = saturation_vapor_pressure_pa(T_c);
+  float pv = (rh / 100.0f) * p_sat;
+
+  if (abs_hum) {
+    float ah = absolute_humidity_g_m3(T_c, pv);
+    if (std::isfinite(ah))
+      abs_hum->publish_state(ah);
+  }
+  if (dew) {
+    float tdp = dew_point_c(pv);
+    if (std::isfinite(tdp))
+      dew->publish_state(tdp);
+  }
+
+  float W = humidity_ratio_kg_kg(pv, p_pa);
+  if (hum_ratio && std::isfinite(W))
+    hum_ratio->publish_state(W * 1000.0f);
+  if (enthalpy && std::isfinite(W)) {
+    float h = enthalpy_kj_kg(T_c, W);
+    if (std::isfinite(h))
+      enthalpy->publish_state(h);
+  }
+}
+
 void HpUkfComponent::setup() {
   uint32_t t_setup_start_us = micros();
   ESP_LOGCONFIG(TAG, "Setting up HP-UKF component");
@@ -130,6 +199,11 @@ void HpUkfComponent::setup() {
     if (em_lambda_r_inlet_sensor_) em_lambda_r_inlet_sensor_->publish_state(em_lambda_r_inlet_);
     if (em_lambda_r_outlet_sensor_) em_lambda_r_outlet_sensor_->publish_state(em_lambda_r_outlet_);
   }
+
+  publish_psychrometric(x[0], x[1], pressure_pa_,
+                        inlet_absolute_humidity_, inlet_dew_point_, inlet_enthalpy_, inlet_humidity_ratio_);
+  publish_psychrometric(x[2], x[3], pressure_pa_,
+                        outlet_absolute_humidity_, outlet_dew_point_, outlet_enthalpy_, outlet_humidity_ratio_);
 
   uint32_t t_setup_end_us = micros();
   uint32_t free_heap = get_free_heap_bytes();
@@ -231,6 +305,15 @@ void HpUkfComponent::update() {
     if (em_lambda_r_inlet_sensor_) em_lambda_r_inlet_sensor_->publish_state(em_lambda_r_inlet_);
     if (em_lambda_r_outlet_sensor_) em_lambda_r_outlet_sensor_->publish_state(em_lambda_r_outlet_);
   }
+
+  if (std::isfinite(x[0]) && std::isfinite(x[1])) {
+    publish_psychrometric(x[0], x[1], pressure_pa_,
+                          inlet_absolute_humidity_, inlet_dew_point_, inlet_enthalpy_, inlet_humidity_ratio_);
+  }
+  if (std::isfinite(x[2]) && std::isfinite(x[3])) {
+    publish_psychrometric(x[2], x[3], pressure_pa_,
+                          outlet_absolute_humidity_, outlet_dew_point_, outlet_enthalpy_, outlet_humidity_ratio_);
+  }
 }
 
 void HpUkfComponent::dump_config() {
@@ -242,6 +325,7 @@ void HpUkfComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "  Inlet humidity sensor: %s", inlet_humidity_ ? "set" : "not set");
   ESP_LOGCONFIG(TAG, "  Outlet temperature sensor: %s", outlet_temperature_ ? "set" : "not set");
   ESP_LOGCONFIG(TAG, "  Outlet humidity sensor: %s", outlet_humidity_ ? "set" : "not set");
+  ESP_LOGCONFIG(TAG, "  Atmospheric pressure: %.2f hPa", pressure_pa_ / 100.0f);
   ESP_LOGCONFIG(TAG, "  EM auto-tune: %s", em_autotune_ ? "enabled" : "disabled");
   if (em_autotune_) {
     ESP_LOGCONFIG(TAG, "  EM lambda_q=%.3f, lambda_r_inlet=%.3f, lambda_r_outlet=%.3f, inflation=%.2f",
