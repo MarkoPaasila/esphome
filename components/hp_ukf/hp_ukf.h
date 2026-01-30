@@ -61,6 +61,16 @@ class HpUkfComponent : public PollingComponent {
   void set_em_lambda_r_inlet_sensor(sensor::Sensor *s) { em_lambda_r_inlet_sensor_ = s; }
   void set_em_lambda_r_outlet_sensor(sensor::Sensor *s) { em_lambda_r_outlet_sensor_ = s; }
 
+  void set_atmospheric_pressure(float pa) { pressure_pa_ = pa; }
+  void set_inlet_absolute_humidity_sensor(sensor::Sensor *s) { inlet_absolute_humidity_ = s; }
+  void set_inlet_dew_point_sensor(sensor::Sensor *s) { inlet_dew_point_ = s; }
+  void set_inlet_enthalpy_sensor(sensor::Sensor *s) { inlet_enthalpy_ = s; }
+  void set_inlet_humidity_ratio_sensor(sensor::Sensor *s) { inlet_humidity_ratio_ = s; }
+  void set_outlet_absolute_humidity_sensor(sensor::Sensor *s) { outlet_absolute_humidity_ = s; }
+  void set_outlet_dew_point_sensor(sensor::Sensor *s) { outlet_dew_point_ = s; }
+  void set_outlet_enthalpy_sensor(sensor::Sensor *s) { outlet_enthalpy_ = s; }
+  void set_outlet_humidity_ratio_sensor(sensor::Sensor *s) { outlet_humidity_ratio_ = s; }
+
  protected:
   sensor::Sensor *inlet_temperature_{nullptr};
   sensor::Sensor *inlet_humidity_{nullptr};
@@ -98,6 +108,16 @@ class HpUkfComponent : public PollingComponent {
   sensor::Sensor *em_lambda_q_sensor_{nullptr};
   sensor::Sensor *em_lambda_r_inlet_sensor_{nullptr};
   sensor::Sensor *em_lambda_r_outlet_sensor_{nullptr};
+
+  float pressure_pa_{101325.0f};
+  sensor::Sensor *inlet_absolute_humidity_{nullptr};
+  sensor::Sensor *inlet_dew_point_{nullptr};
+  sensor::Sensor *inlet_enthalpy_{nullptr};
+  sensor::Sensor *inlet_humidity_ratio_{nullptr};
+  sensor::Sensor *outlet_absolute_humidity_{nullptr};
+  sensor::Sensor *outlet_dew_point_{nullptr};
+  sensor::Sensor *outlet_enthalpy_{nullptr};
+  sensor::Sensor *outlet_humidity_ratio_{nullptr};
 
   HpUkfFilter filter_;
   uint32_t last_update_ms_{0};
