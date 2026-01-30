@@ -46,32 +46,32 @@ void HpUkfFilter::set_state_dimension(int n) {
   update_weights();
   for (int i = 0; i < n_ * n_; i++)
     Q_[i] = 0.0f;
-  Q_[0 * n_ + 0] = 0.02255297f;   // T_in °C²
-  Q_[1 * n_ + 1] = 0.03863900f;   // RH_in %²
-  Q_[2 * n_ + 2] = 0.03064128f;   // T_out °C²
-  Q_[3 * n_ + 3] = 0.04204632f;   // RH_out %²
+  Q_[0 * n_ + 0] = 0.001074034f;   // T_in °C²
+  Q_[1 * n_ + 1] = 0.01395682f;    // RH_in %²
+  Q_[2 * n_ + 2] = 0.002934240f;   // T_out °C²
+  Q_[3 * n_ + 3] = 0.03639173f;    // RH_out %²
   if (n_ >= 6) {
     Q_[4 * n_ + 4] = 1.0f;         // air_flow (L/s)²
     Q_[5 * n_ + 5] = 0.01f;        // delivered_power (kW)²
   }
   if (n_ >= 8 && n_ < 10) {
-    Q_[4 * n_ + 4] = 0.004649542f;  // dT_in
-    Q_[5 * n_ + 5] = 0.005577928f;  // dT_out
-    Q_[6 * n_ + 6] = 0.007255317f;  // dRH_in
-    Q_[7 * n_ + 7] = 0.007194013f;  // dRH_out
+    Q_[4 * n_ + 4] = 0.0001467592f;  // dT_in
+    Q_[5 * n_ + 5] = 0.0005582764f;  // dT_out
+    Q_[6 * n_ + 6] = 0.002286525f;   // dRH_in
+    Q_[7 * n_ + 7] = 0.005536150f;   // dRH_out
   }
   if (n_ >= 10) {
-    Q_[6 * n_ + 6] = 0.004649542f;  // dT_in
-    Q_[7 * n_ + 7] = 0.005577928f;  // dT_out
-    Q_[8 * n_ + 8] = 0.007255317f;  // dRH_in
-    Q_[9 * n_ + 9] = 0.007194013f;  // dRH_out
+    Q_[6 * n_ + 6] = 0.0001467592f;  // dT_in
+    Q_[7 * n_ + 7] = 0.0005582764f;  // dT_out
+    Q_[8 * n_ + 8] = 0.002286525f;   // dRH_in
+    Q_[9 * n_ + 9] = 0.005536150f;   // dRH_out
   }
   for (int i = 0; i < M * M; i++)
     R_[i] = 0.0f;
-  R_[0 * M + 0] = 0.1317456f;    // T_in °C²
-  R_[1 * M + 1] = 0.2825074f;    // RH_in %²
-  R_[2 * M + 2] = 0.001090135f;  // T_out °C²
-  R_[3 * M + 3] = 0.0002252902f; // RH_out %²
+  R_[0 * M + 0] = 0.0007687177f;  // T_in °C²
+  R_[1 * M + 1] = 0.02196444f;    // RH_in %²
+  R_[2 * M + 2] = 0.002987398f;   // T_out °C²
+  R_[3 * M + 3] = 0.05590067f;    // RH_out %²
   R_[4 * M + 4] = 10.0f;         // air_flow (L/s)²
 }
 
@@ -119,15 +119,41 @@ void HpUkfFilter::get_measurement_noise_diag(float *r_diag) const {
     r_diag[i] = R_[i * M + i];
 }
 
+void HpUkfFilter::set_control_input(uint8_t action, float compressor_freq_hz, float power_kw) {
+  control_action_ = action;
+  control_compressor_hz_ = compressor_freq_hz;
+  control_power_kw_ = power_kw;
+}
+
+// Threshold below which input power (kW) is treated as "no power" (correlated to compressor off).
+static constexpr float POWER_NO_POWER_THRESHOLD_KW = 0.01f;
+
+// True when control input indicates no heating/cooling power (OFF, IDLE, FAN, DRY, compressor off, or power near 0).
+static bool control_no_power(uint8_t action, float compressor_hz, float power_kw) {
+  if (action == 0 || action == 4 || action == 5 || action == 6)  // OFF, IDLE, DRYING, FAN
+    return true;
+  if (!std::isfinite(compressor_hz) || compressor_hz <= 0.0f)
+    return true;
+  if (std::isfinite(power_kw) && power_kw >= 0.0f && power_kw < POWER_NO_POWER_THRESHOLD_KW)
+    return true;
+  return false;
+}
+
 void HpUkfFilter::state_transition(const float *x_in, float dt, float *x_out) const {
+  bool no_power = control_no_power(control_action_, control_compressor_hz_, control_power_kw_);
+
   if (n_ >= 10) {
     x_out[0] = x_in[0] + x_in[6] * dt;   // T_in
     x_out[1] = x_in[1] + x_in[8] * dt;   // RH_in
     x_out[2] = x_in[2] + x_in[7] * dt;   // T_out
     x_out[3] = x_in[3] + x_in[9] * dt;   // RH_out
     x_out[4] = x_in[4];  // air_flow L/s
-    float p_kw = delivered_power_kw(x_out[0], x_out[1], x_out[2], x_out[3], x_out[4], pressure_pa_);
-    x_out[5] = std::isfinite(p_kw) ? p_kw : x_in[5];
+    if (no_power) {
+      x_out[5] = 0.0f;
+    } else {
+      float p_kw = delivered_power_kw(x_out[0], x_out[1], x_out[2], x_out[3], x_out[4], pressure_pa_);
+      x_out[5] = std::isfinite(p_kw) ? p_kw : x_in[5];
+    }
     x_out[6] = x_in[6];
     x_out[7] = x_in[7];
     x_out[8] = x_in[8];
@@ -147,8 +173,12 @@ void HpUkfFilter::state_transition(const float *x_in, float dt, float *x_out) co
     x_out[2] = x_in[2];
     x_out[3] = x_in[3];
     x_out[4] = x_in[4];
-    float p_kw = delivered_power_kw(x_out[0], x_out[1], x_out[2], x_out[3], x_out[4], pressure_pa_);
-    x_out[5] = std::isfinite(p_kw) ? p_kw : x_in[5];
+    if (no_power) {
+      x_out[5] = 0.0f;
+    } else {
+      float p_kw = delivered_power_kw(x_out[0], x_out[1], x_out[2], x_out[3], x_out[4], pressure_pa_);
+      x_out[5] = std::isfinite(p_kw) ? p_kw : x_in[5];
+    }
   } else {
     x_out[0] = x_in[0];
     x_out[1] = x_in[1];

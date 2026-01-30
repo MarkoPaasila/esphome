@@ -33,11 +33,14 @@ external_components:
 hp_ukf:
   id: ukf
   update_interval: 1s
+  climate: hp
   inlet_temperature: tin
   inlet_humidity: hin
   outlet_temperature: tout
   outlet_humidity: hout
   air_flow: vol
+  compressor_frequency: compressor_freq
+  power_sensor: power
   track_temperature_derivatives: true
   em_autotune: true
   em_inflation: 1.0
@@ -90,6 +93,7 @@ climate:
       temperature_step: 1.0 
     compressor_frequency_sensor:
       name: "Compressor frequency"
+      id: compressor_freq
       filters: 
         - heartbeat: 300s
         - lambda: |-
@@ -119,12 +123,12 @@ i2c:
     frequency: 100kHz
 
 uart:
-#  - id: pzem_uart
-#    tx_pin: 17
-#    rx_pin: 16
-#    baud_rate: 9600
-#    stop_bits: 1
-#    debug:
+  - id: pzem_uart
+    tx_pin: 17
+    rx_pin: 16
+    baud_rate: 9600
+    stop_bits: 1
+    debug:
   - id: HP_UART
     tx_pin: 1
     rx_pin: 3
@@ -168,18 +172,18 @@ sensor:
       bool defrosting = false;  // id(G_state) / ST_DEFROSTING_STARTED not configured
 
       if (cool) {
-        if (s == 3){return 276.0;}
-        else if (s == 4) {return 402.0;}
-        else if (s == 6) {return 552.0;}
-        else if (s == 5) {return 726.0;}
-        else {return 276.0;}
+        if (s == 3){return 76.67;}
+        else if (s == 4) {return 111.67;}
+        else if (s == 6) {return 153.33;}
+        else if (s == 5) {return 201.67;}
+        else {return 76.67;}
       } else if (heat) {
-        if (defrosting){return 10.0;}
-        else if (s == 3) {return 270.0;}
-        else if (s == 4) {return 402.0;}
-        else if (s == 6) {return 552.0;}
-        else if (s == 5) {return 726.0;}
-        else {return 50.0;}
+        if (defrosting){return 2.78;}
+        else if (s == 3) {return 75.0;}
+        else if (s == 4) {return 111.67;}
+        else if (s == 6) {return 153.33;}
+        else if (s == 5) {return 201.67;}
+        else {return 13.89;}
       }
       return 0.0;
 

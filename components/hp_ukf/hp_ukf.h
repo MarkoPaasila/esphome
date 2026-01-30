@@ -3,6 +3,7 @@
 #include "esphome/core/component.h"
 #include "esphome/core/hal.h"
 #include "esphome/components/sensor/sensor.h"
+#include "esphome/components/climate/climate.h"
 #include "hp_ukf_ukf.h"
 
 namespace esphome {
@@ -75,6 +76,10 @@ class HpUkfComponent : public PollingComponent {
   void set_filtered_air_flow_sensor(sensor::Sensor *s) { filtered_air_flow_ = s; }
   void set_delivered_power_sensor(sensor::Sensor *s) { delivered_power_ = s; }
 
+  void set_climate(climate::Climate *c) { climate_ = c; }
+  void set_compressor_frequency_sensor(sensor::Sensor *s) { compressor_frequency_ = s; }
+  void set_power_sensor(sensor::Sensor *s) { power_sensor_ = s; }
+
  protected:
   sensor::Sensor *inlet_temperature_{nullptr};
   sensor::Sensor *inlet_humidity_{nullptr};
@@ -126,6 +131,10 @@ class HpUkfComponent : public PollingComponent {
   sensor::Sensor *air_flow_{nullptr};
   sensor::Sensor *filtered_air_flow_{nullptr};
   sensor::Sensor *delivered_power_{nullptr};
+
+  climate::Climate *climate_{nullptr};
+  sensor::Sensor *compressor_frequency_{nullptr};
+  sensor::Sensor *power_sensor_{nullptr};
 
   HpUkfFilter filter_;
   uint32_t last_update_ms_{0};

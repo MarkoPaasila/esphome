@@ -59,6 +59,9 @@ hp_ukf:
 | `outlet_temperature`           | sensor  | (none)  | Sensor ID for outlet air temperature (°C) |
 | `outlet_humidity`              | sensor  | (none)  | Sensor ID for outlet air relative humidity (%) |
 | `air_flow`                     | sensor  | (none)  | Optional. Sensor ID for air flow in **L/s** (liters per second). When set, UKF state includes air flow and delivered power; optional `filtered_air_flow` and `delivered_power` sensors can be exposed. |
+| `climate`                      | climate | (none)  | Optional. Climate entity ID (e.g. heat pump). The component reads **climate action** (OFF, HEATING, COOLING, IDLE, DRYING, FAN) each update and passes it as a control input to the UKF so the predict step can adapt (e.g. force delivered_power to 0 when OFF/IDLE). |
+| `compressor_frequency`         | sensor  | (none)  | Optional. Sensor ID for compressor frequency in **Hz**. When set together with `climate`, the UKF uses it as a control input (e.g. when compressor is 0 Hz and action is OFF/IDLE, delivered_power is forced to 0). With [MitsubishiCN105ESPHome](https://github.com/echavet/MitsubishiCN105ESPHome), give the climate’s `compressor_frequency_sensor` an `id` and reference it here. |
+| `power_sensor`                  | sensor  | (none)  | Optional. Sensor ID for **input power in W** (e.g. from PZEM or CN105 `input_power_sensor`). Power is correlated to compressor speed; when power is below ~10 W the UKF treats it as no delivered power. Used as a control input like climate action and compressor frequency. |
 | `track_temperature_derivatives`| boolean | `true`  | If true, state is 8D or 10D (with air flow: T_in, RH_in, T_out, RH_out, air_flow, delivered_power, dT_in, dT_out, dRH_in, dRH_out); if false, 4D or 6D (no derivatives). |
 | `atmospheric_pressure`        | float   | `1013.25` | Atmospheric pressure in hPa. Used for psychrometric calculations (absolute humidity, enthalpy) and delivered power (density). Range 10–1200 hPa. |
 | `em_autotune`                 | boolean | `false` | Enable EM (Expectation-Maximization) auto-tune for process (Q) and measurement (R) noise with forgetting factors. |
@@ -79,6 +82,27 @@ hp_ukf:
     name: "${name} Filtered Air Flow"
   delivered_power:
     name: "${name} Delivered Power"
+```
+
+**Optional climate, compressor frequency, and power sensor** (control inputs for the UKF): When `climate` is set, the component reads the climate’s current **action** (OFF, HEATING, COOLING, IDLE, DRYING, FAN) each update and passes it to the filter. When action is OFF, IDLE, FAN, or DRY—or when `compressor_frequency` is 0 or unknown—or when `power_sensor` (in W) is below ~10 W—the UKF forces **delivered_power** to 0 in the predict step. Power is correlated to compressor speed. With [MitsubishiCN105ESPHome](https://github.com/echavet/MitsubishiCN105ESPHome), give the climate’s `compressor_frequency_sensor` an `id` and reference it in `compressor_frequency`; you can also use `input_power_sensor` as `power_sensor`. Example:
+
+```yaml
+climate:
+  - platform: cn105
+    id: hp
+    compressor_frequency_sensor:
+      id: compressor_freq
+      name: "Compressor frequency"
+      # ...
+    input_power_sensor:
+      id: hp_power
+      name: "Input Power"
+      # ...
+hp_ukf:
+  # ...
+  climate: hp
+  compressor_frequency: compressor_freq
+  power_sensor: hp_power
 ```
 
 **Optional psychrometric sensors** (only created if you add the block with a name): computed from filtered inlet/outlet temperature and relative humidity (UKF state); not part of the UKF state. Use `atmospheric_pressure` for absolute humidity and enthalpy. Options: `inlet_absolute_humidity` (g/m³), `inlet_dew_point` (°C), `inlet_enthalpy` (kJ/kg), `inlet_humidity_ratio` (g/kg); `outlet_absolute_humidity`, `outlet_dew_point`, `outlet_enthalpy`, `outlet_humidity_ratio`. Example:

@@ -11,9 +11,9 @@ from esphome.const import (
     UNIT_CELSIUS,
     UNIT_PERCENT,
 )
-from esphome.components import sensor
+from esphome.components import climate, sensor
 
-DEPENDENCIES = ["sensor"]
+DEPENDENCIES = ["sensor", "climate"]
 
 hp_ukf_ns = cg.esphome_ns.namespace("hp_ukf")
 HpUkfComponent = hp_ukf_ns.class_("HpUkfComponent", cg.PollingComponent)
@@ -65,6 +65,9 @@ CONF_OUTLET_HUMIDITY_RATIO = "outlet_humidity_ratio"
 CONF_AIR_FLOW = "air_flow"
 CONF_FILTERED_AIR_FLOW = "filtered_air_flow"
 CONF_DELIVERED_POWER = "delivered_power"
+CONF_CLIMATE = "climate"
+CONF_COMPRESSOR_FREQUENCY = "compressor_frequency"
+CONF_POWER_SENSOR = "power_sensor"
 
 
 def _em_lambda(value):
@@ -290,6 +293,9 @@ CONFIG_SCHEMA = cv.Schema(
             accuracy_decimals=3,
             state_class=STATE_CLASS_MEASUREMENT,
         ),
+        cv.Optional(CONF_CLIMATE): cv.use_id(climate.Climate),
+        cv.Optional(CONF_COMPRESSOR_FREQUENCY): cv.use_id(sensor.Sensor),
+        cv.Optional(CONF_POWER_SENSOR): cv.use_id(sensor.Sensor),
     }
 ).extend(cv.COMPONENT_SCHEMA)
 
@@ -323,6 +329,15 @@ async def to_code(config):
     if CONF_AIR_FLOW in config:
         sens = await cg.get_variable(config[CONF_AIR_FLOW])
         cg.add(var.set_air_flow_sensor(sens))
+    if CONF_CLIMATE in config:
+        clim = await cg.get_variable(config[CONF_CLIMATE])
+        cg.add(var.set_climate(clim))
+    if CONF_COMPRESSOR_FREQUENCY in config:
+        sens = await cg.get_variable(config[CONF_COMPRESSOR_FREQUENCY])
+        cg.add(var.set_compressor_frequency_sensor(sens))
+    if CONF_POWER_SENSOR in config:
+        sens = await cg.get_variable(config[CONF_POWER_SENSOR])
+        cg.add(var.set_power_sensor(sens))
 
     cg.add(var.set_em_autotune(config[CONF_EM_AUTOTUNE]))
     cg.add(var.set_em_lambda_q(config[CONF_EM_LAMBDA_Q]))
