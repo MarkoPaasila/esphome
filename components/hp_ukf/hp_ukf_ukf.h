@@ -45,7 +45,8 @@ class HpUkfFilter {
   float R_[M * M]{};
 
   // UKF parameters: alpha, beta, kappa -> lambda = alpha^2 * (n + kappa) - n
-  float alpha_{1e-3f};
+  // alpha must be >= 1 (or kappa large) so lambda >= 0; else weights are invalid and P becomes non-PSD -> NaN state
+  float alpha_{1.0f};
   float beta_{2.0f};
   float kappa_{0.0f};
   float lambda_{0.0f};

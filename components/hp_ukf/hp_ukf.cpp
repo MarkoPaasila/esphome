@@ -1,5 +1,6 @@
 #include "hp_ukf.h"
 #include "esphome/core/application.h"
+#include "esphome/core/component.h"
 #include "esphome/core/log.h"
 #include <cmath>
 #include <algorithm>
@@ -68,10 +69,7 @@ void HpUkfComponent::setup() {
 }
 
 void HpUkfComponent::update() {
-  // #region agent log
-  ESP_LOGI(TAG, "update() entered initialized_=%d", initialized_ ? 1 : 0);
-  // #endregion
-  if (!initialized_)
+  if (this->is_failed() || !initialized_)
     return;
 
   uint32_t now_ms = millis();
@@ -89,22 +87,10 @@ void HpUkfComponent::update() {
   for (int i = 0; i < HpUkfFilter::M; i++)
     mask[i] = !std::isnan(z[i]);
 
-  // #region agent log
-  ESP_LOGI(TAG, "z=[%.2f,%.2f,%.2f,%.2f] mask=%d%d%d%d", z[0], z[1], z[2], z[3],
-           mask[0] ? 1 : 0, mask[1] ? 1 : 0, mask[2] ? 1 : 0, mask[3] ? 1 : 0);
-  // #endregion
-
   filter_.update(z, mask);
   last_update_ms_ = now_ms;
 
   const float *x = filter_.get_state();
-  // #region agent log
-  ESP_LOGI(TAG, "x=[%.3f,%.3f,%.3f,%.3f] finite=%d%d%d%d ptrs=%d%d",
-           x[0], x[1], x[2], x[3],
-           std::isfinite(x[0]) ? 1 : 0, std::isfinite(x[1]) ? 1 : 0,
-           std::isfinite(x[2]) ? 1 : 0, std::isfinite(x[3]) ? 1 : 0,
-           filtered_inlet_temperature_ ? 1 : 0, filtered_inlet_humidity_ ? 1 : 0);
-  // #endregion
   // Only publish finite values so we don't overwrite with NaN (e.g. when source
   // sensors haven't reported yet or filter is still converging).
   if (filtered_inlet_temperature_ && std::isfinite(x[0]))
@@ -129,7 +115,7 @@ void HpUkfComponent::update() {
 
 void HpUkfComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "HP-UKF component");
-  ESP_LOGCONFIG(TAG, "  Update interval: %u ms", this->get_update_interval());
+  LOG_UPDATE_INTERVAL(this);
   ESP_LOGCONFIG(TAG, "  Track derivatives (dT_in, dT_out, dRH_in, dRH_out): %s",
                 track_derivatives_ ? "yes" : "no");
   ESP_LOGCONFIG(TAG, "  Inlet temperature sensor: %s", inlet_temperature_ ? "set" : "not set");
