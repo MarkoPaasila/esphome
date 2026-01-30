@@ -58,8 +58,9 @@ hp_ukf:
 | `inlet_humidity`               | sensor  | (none)  | Sensor ID for inlet air relative humidity (%) |
 | `outlet_temperature`           | sensor  | (none)  | Sensor ID for outlet air temperature (°C) |
 | `outlet_humidity`              | sensor  | (none)  | Sensor ID for outlet air relative humidity (%) |
-| `track_temperature_derivatives`| boolean | `true`  | If true, state is 8D (T_in, RH_in, T_out, RH_out, dT_in, dT_out, dRH_in, dRH_out); if false, 4D (no derivatives). |
-| `atmospheric_pressure`        | float   | `1013.25` | Atmospheric pressure in hPa. Used for psychrometric calculations (absolute humidity, enthalpy). Range 10–1200 hPa. |
+| `air_flow`                     | sensor  | (none)  | Optional. Sensor ID for air flow in **L/s** (liters per second). When set, UKF state includes air flow and delivered power; optional `filtered_air_flow` and `delivered_power` sensors can be exposed. |
+| `track_temperature_derivatives`| boolean | `true`  | If true, state is 8D or 10D (with air flow: T_in, RH_in, T_out, RH_out, air_flow, delivered_power, dT_in, dT_out, dRH_in, dRH_out); if false, 4D or 6D (no derivatives). |
+| `atmospheric_pressure`        | float   | `1013.25` | Atmospheric pressure in hPa. Used for psychrometric calculations (absolute humidity, enthalpy) and delivered power (density). Range 10–1200 hPa. |
 | `em_autotune`                 | boolean | `false` | Enable EM (Expectation-Maximization) auto-tune for process (Q) and measurement (R) noise with forgetting factors. |
 | `em_lambda_q`                | float   | `0.995` | Forgetting factor for Q (process variance). Range (0, 1]; higher = slower adaptation. |
 | `em_lambda_r_inlet`          | float   | `0.998` | Forgetting factor for R of inlet T and RH. Inlet changes little; use higher value. |
@@ -67,6 +68,18 @@ hp_ukf:
 | `em_inflation`               | float   | `0.5`   | Inflation factor applied to EM estimates before smoothing (non-cumulative). Default 0.5 yields R and Q 50% larger. Range [0, 2]. |
 
 Optional EM sensors (only created if configured): `em_q_t_in`, `em_q_rh_in`, `em_q_t_out`, `em_q_rh_out`, `em_q_dt_in`, `em_q_dt_out`, `em_q_drh_in`, `em_q_drh_out` (process noise diagonal, variance units); `em_r_t_in`, `em_r_rh_in`, `em_r_t_out`, `em_r_rh_out` (measurement noise diagonal); `em_lambda_q_sensor`, `em_lambda_r_inlet_sensor`, `em_lambda_r_outlet_sensor` (current lambda values for debugging).
+
+**Optional air flow and delivered power** (only when `air_flow` is set): `filtered_air_flow` (L/s) publishes the UKF-filtered air flow; `delivered_power` (kW) publishes power from air flow and enthalpy difference: P = m_dot × (h_out − h_in), with m_dot from volumetric flow (L/s → m³/s) × density at inlet. Both require a name. Example:
+
+```yaml
+hp_ukf:
+  # ...
+  air_flow: air_flow
+  filtered_air_flow:
+    name: "${name} Filtered Air Flow"
+  delivered_power:
+    name: "${name} Delivered Power"
+```
 
 **Optional psychrometric sensors** (only created if you add the block with a name): computed from filtered inlet/outlet temperature and relative humidity (UKF state); not part of the UKF state. Use `atmospheric_pressure` for absolute humidity and enthalpy. Options: `inlet_absolute_humidity` (g/m³), `inlet_dew_point` (°C), `inlet_enthalpy` (kJ/kg), `inlet_humidity_ratio` (g/kg); `outlet_absolute_humidity`, `outlet_dew_point`, `outlet_enthalpy`, `outlet_humidity_ratio`. Example:
 

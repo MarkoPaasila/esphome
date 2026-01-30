@@ -37,6 +37,7 @@ hp_ukf:
   inlet_humidity: hin
   outlet_temperature: tout
   outlet_humidity: hout
+  air_flow: vol
   track_temperature_derivatives: true
   em_autotune: true
   em_inflation: 1.0
@@ -72,6 +73,10 @@ hp_ukf:
     name: "${name} Outlet Dew Point"
   outlet_enthalpy:
     name: "${name} Outlet Enthalpy"
+  filtered_air_flow:
+    name: "${name} Filtered Air Flow"
+  delivered_power:
+    name: "${name} Delivered Power"
 
 climate:
   - platform: cn105
@@ -82,9 +87,7 @@ climate:
     visual:
       min_temperature: 16.0
       max_temperature: 31.0
-      temperature_step: 1.0   
-    outside_air_temperature_sensor:
-      name: "Outdoor Temperature Internal"
+      temperature_step: 1.0 
     compressor_frequency_sensor:
       name: "Compressor frequency"
       filters: 
@@ -95,18 +98,9 @@ climate:
             } else {
               return x;
             }
-    vertical_vane_select:
-      name: "Vertical Vane Orientation"
-    horizontal_vane_select:
-      name: "Horizontal Vane Orientation"
-    isee_sensor:
-      name: "ISEE Sensor"
-    stage_sensor:
-      name: "Stage Sensor"
-    sub_mode_sensor:
-      name: "Sub Mode Sensor"
-    auto_sub_mode_sensor:
-      name: "Auto Sub Mode Sensor"
+    on_state: 
+      then:
+        - component.update: vol
 
 one_wire:
   - platform: gpio
@@ -136,6 +130,11 @@ uart:
     rx_pin: 3
     baud_rate: 2400
 
+modbus:
+  id: mbus
+  uart_id: pzem_uart
+  disable_crc: true
+
 sensor:      
 # -------------- SHT30 ------------------ #
   - platform: sht3xd
@@ -153,21 +152,48 @@ sensor:
     humidity:
       id: hout
 
-  - platform: debug
-    free:
-      name: "Heap Free"
-      filters:
-        - throttle_average: 60s
-    block:
-      name: "Heap Max Block"
-      filters:
-        - throttle_average: 60s
-    loop_time:
-      name: "Loop Time"
-      filters:
-        - max:
-            window_size: 60
-            send_every: 60
+  - name: "Air Volume"
+    platform: template
+    id: vol
+    update_interval: never
+    unit_of_measurement: "l/s"
+    state_class: measurement
+    lambda: |-
+      int mode = (int) id(hp).mode;
+      auto fan_opt = id(hp).fan_mode;
+      int s = fan_opt.has_value() ? (int) fan_opt.value() : 0;
+      bool heat = (mode == 1 || mode == 3);
+      bool cool = (mode == 2 || mode == 4);
+      bool off = (mode == 0);
+      bool defrosting = false;  // id(G_state) / ST_DEFROSTING_STARTED not configured
+
+      if (cool) {
+        if (s == 3){return 276.0;}
+        else if (s == 4) {return 402.0;}
+        else if (s == 6) {return 552.0;}
+        else if (s == 5) {return 726.0;}
+        else {return 276.0;}
+      } else if (heat) {
+        if (defrosting){return 10.0;}
+        else if (s == 3) {return 270.0;}
+        else if (s == 4) {return 402.0;}
+        else if (s == 6) {return 552.0;}
+        else if (s == 5) {return 726.0;}
+        else {return 50.0;}
+      }
+      return 0.0;
+
+# ----------------- PZEM ------------------ #
+  - platform: pzemac
+    update_interval: 10s
+    modbus_id: mbus
+    power:
+      name: "Power"
+      id: power
+      unit_of_measurement: "W"
+      icon: mdi:flash-outline
+      device_class: power
+      state_class: measurement
 
 debug:
   update_interval: 10s

@@ -5,29 +5,74 @@
 namespace esphome {
 namespace hp_ukf {
 
+// Psychrometric helpers (Magnus, T in °C, p in Pa). Single precision only.
+static float saturation_vapor_pressure_pa(float T_c) {
+  float denom = 243.04f + T_c;
+  if (denom < 1.0f)
+    denom = 1.0f;
+  return 610.94f * expf(17.625f * T_c / denom);
+}
+
+static float humidity_ratio_kg_kg(float pv_pa, float p_pa) {
+  float p_minus_pv = p_pa - pv_pa;
+  if (p_minus_pv < 10.0f)
+    return 0.0f;
+  return 0.62198f * pv_pa / p_minus_pv;
+}
+
+static float enthalpy_kj_kg(float T_c, float W_kg_kg) {
+  return 1.006f * T_c + W_kg_kg * (2501.0f + 1.86f * T_c);
+}
+
+static float delivered_power_kw(float T_in, float rh_in, float T_out, float rh_out,
+                                float air_flow_L_s, float pressure_pa) {
+  float pv_in = (rh_in / 100.0f) * saturation_vapor_pressure_pa(T_in);
+  float W_in = humidity_ratio_kg_kg(pv_in, pressure_pa);
+  float h_in = enthalpy_kj_kg(T_in, W_in);
+  float pv_out = (rh_out / 100.0f) * saturation_vapor_pressure_pa(T_out);
+  float W_out = humidity_ratio_kg_kg(pv_out, pressure_pa);
+  float h_out = enthalpy_kj_kg(T_out, W_out);
+  float T_in_K = T_in + 273.15f;
+  if (T_in_K < 1.0f)
+    T_in_K = 1.0f;
+  float rho = pressure_pa / (287.0f * T_in_K);
+  float air_flow_m3_s = air_flow_L_s / 1000.0f;
+  float m_dot = air_flow_m3_s * rho;
+  return m_dot * (h_out - h_in);
+}
+
 void HpUkfFilter::set_state_dimension(int n) {
-  n_ = (n == 4 || n == 8) ? n : 8;
+  n_ = (n == 4 || n == 6 || n == 8 || n == 10) ? n : 8;
   update_weights();
-  // Default process noise (from EM-converged log copy-paste).
   for (int i = 0; i < n_ * n_; i++)
     Q_[i] = 0.0f;
   Q_[0 * n_ + 0] = 0.02255297f;   // T_in °C²
   Q_[1 * n_ + 1] = 0.03863900f;   // RH_in %²
   Q_[2 * n_ + 2] = 0.03064128f;   // T_out °C²
   Q_[3 * n_ + 3] = 0.04204632f;   // RH_out %²
-  if (n_ >= 8) {
+  if (n_ >= 6) {
+    Q_[4 * n_ + 4] = 1.0f;         // air_flow (L/s)²
+    Q_[5 * n_ + 5] = 0.01f;        // delivered_power (kW)²
+  }
+  if (n_ >= 8 && n_ < 10) {
     Q_[4 * n_ + 4] = 0.004649542f;  // dT_in
     Q_[5 * n_ + 5] = 0.005577928f;  // dT_out
     Q_[6 * n_ + 6] = 0.007255317f;  // dRH_in
     Q_[7 * n_ + 7] = 0.007194013f;  // dRH_out
   }
-  // Default measurement noise (from EM-converged log copy-paste).
+  if (n_ >= 10) {
+    Q_[6 * n_ + 6] = 0.004649542f;  // dT_in
+    Q_[7 * n_ + 7] = 0.005577928f;  // dT_out
+    Q_[8 * n_ + 8] = 0.007255317f;  // dRH_in
+    Q_[9 * n_ + 9] = 0.007194013f;  // dRH_out
+  }
   for (int i = 0; i < M * M; i++)
     R_[i] = 0.0f;
   R_[0 * M + 0] = 0.1317456f;    // T_in °C²
   R_[1 * M + 1] = 0.2825074f;    // RH_in %²
   R_[2 * M + 2] = 0.001090135f;  // T_out °C²
   R_[3 * M + 3] = 0.0002252902f; // RH_out %²
+  R_[4 * M + 4] = 10.0f;         // air_flow (L/s)²
 }
 
 void HpUkfFilter::update_weights() {
@@ -75,15 +120,40 @@ void HpUkfFilter::get_measurement_noise_diag(float *r_diag) const {
 }
 
 void HpUkfFilter::state_transition(const float *x_in, float dt, float *x_out) const {
-  x_out[0] = x_in[0] + (n_ >= 8 ? x_in[4] * dt : 0.0f);   // T_in
-  x_out[1] = x_in[1] + (n_ >= 8 ? x_in[6] * dt : 0.0f);   // RH_in
-  x_out[2] = x_in[2] + (n_ >= 8 ? x_in[5] * dt : 0.0f);   // T_out
-  x_out[3] = x_in[3] + (n_ >= 8 ? x_in[7] * dt : 0.0f);   // RH_out
-  if (n_ >= 8) {
-    x_out[4] = x_in[4];  // dT_in
-    x_out[5] = x_in[5];  // dT_out
-    x_out[6] = x_in[6];  // dRH_in
-    x_out[7] = x_in[7];  // dRH_out
+  if (n_ >= 10) {
+    x_out[0] = x_in[0] + x_in[6] * dt;   // T_in
+    x_out[1] = x_in[1] + x_in[8] * dt;   // RH_in
+    x_out[2] = x_in[2] + x_in[7] * dt;   // T_out
+    x_out[3] = x_in[3] + x_in[9] * dt;   // RH_out
+    x_out[4] = x_in[4];  // air_flow L/s
+    float p_kw = delivered_power_kw(x_out[0], x_out[1], x_out[2], x_out[3], x_out[4], pressure_pa_);
+    x_out[5] = std::isfinite(p_kw) ? p_kw : x_in[5];
+    x_out[6] = x_in[6];
+    x_out[7] = x_in[7];
+    x_out[8] = x_in[8];
+    x_out[9] = x_in[9];
+  } else if (n_ >= 8) {
+    x_out[0] = x_in[0] + x_in[4] * dt;
+    x_out[1] = x_in[1] + x_in[6] * dt;
+    x_out[2] = x_in[2] + x_in[5] * dt;
+    x_out[3] = x_in[3] + x_in[7] * dt;
+    x_out[4] = x_in[4];
+    x_out[5] = x_in[5];
+    x_out[6] = x_in[6];
+    x_out[7] = x_in[7];
+  } else if (n_ >= 6) {
+    x_out[0] = x_in[0];
+    x_out[1] = x_in[1];
+    x_out[2] = x_in[2];
+    x_out[3] = x_in[3];
+    x_out[4] = x_in[4];
+    float p_kw = delivered_power_kw(x_out[0], x_out[1], x_out[2], x_out[3], x_out[4], pressure_pa_);
+    x_out[5] = std::isfinite(p_kw) ? p_kw : x_in[5];
+  } else {
+    x_out[0] = x_in[0];
+    x_out[1] = x_in[1];
+    x_out[2] = x_in[2];
+    x_out[3] = x_in[3];
   }
 }
 
@@ -188,19 +258,19 @@ void HpUkfFilter::update(const float *z, const bool *mask) {
       z_pred[i] += w * chi[i * n_sigma + k];
   }
 
-  float z_avail[4];
-  float z_pred_avail[4];
+  float z_avail[M];
+  float z_pred_avail[M];
   for (int i = 0; i < m_avail; i++) {
     z_avail[i] = z[idx[i]];
     z_pred_avail[i] = z_pred[idx[i]];
   }
 
-  float Pzz[4 * 4];
+  float Pzz[M * M];
   for (int i = 0; i < m_avail * m_avail; i++)
     Pzz[i] = 0.0f;
   for (int k = 0; k < n_sigma; k++) {
     float w = (k == 0) ? wc0_ : wc_;
-    float dz[4];
+    float dz[M];
     for (int i = 0; i < m_avail; i++)
       dz[i] = chi[idx[i] * n_sigma + k] - z_pred_avail[i];
     for (int i = 0; i < m_avail; i++)
@@ -208,18 +278,18 @@ void HpUkfFilter::update(const float *z, const bool *mask) {
         Pzz[i * m_avail + j] += w * dz[i] * dz[j];
   }
   // Save Pzz prior (before adding R) for EM R adaptation.
-  float Pzz_prior_ii[4];
+  float Pzz_prior_ii[M];
   for (int i = 0; i < m_avail; i++)
     Pzz_prior_ii[i] = Pzz[i * m_avail + i];
   for (int i = 0; i < m_avail; i++)
     Pzz[i * m_avail + i] += R_[idx[i] * M + idx[i]];
 
-  float Pxz[N_MAX * 4];
+  float Pxz[N_MAX * M];
   for (int i = 0; i < dim * m_avail; i++)
     Pxz[i] = 0.0f;
   for (int k = 0; k < n_sigma; k++) {
     float w = (k == 0) ? wc0_ : wc_;
-    float dx[N_MAX], dz[4];
+    float dx[N_MAX], dz[M];
     for (int i = 0; i < dim; i++)
       dx[i] = chi[i * n_sigma + k] - x_[i];
     for (int i = 0; i < m_avail; i++)
@@ -230,11 +300,11 @@ void HpUkfFilter::update(const float *z, const bool *mask) {
   }
 
   // Pzz^{-1} via Gauss-Jordan (m_avail x m_avail)
-  float Pzz_inv[4 * 4];
+  float Pzz_inv[M * M];
   for (int i = 0; i < m_avail; i++)
     for (int j = 0; j < m_avail; j++)
       Pzz_inv[i * m_avail + j] = (i == j) ? 1.0f : 0.0f;
-  float Pzz_work[4 * 4];
+  float Pzz_work[M * M];
   for (int i = 0; i < m_avail * m_avail; i++)
     Pzz_work[i] = Pzz[i];
   for (int col = 0; col < m_avail; col++) {
@@ -271,7 +341,7 @@ void HpUkfFilter::update(const float *z, const bool *mask) {
     }
   }
 
-  float K[N_MAX * 4];
+  float K[N_MAX * M];
   for (int i = 0; i < dim; i++)
     for (int j = 0; j < m_avail; j++) {
       K[i * m_avail + j] = 0.0f;
@@ -279,7 +349,7 @@ void HpUkfFilter::update(const float *z, const bool *mask) {
         K[i * m_avail + j] += Pxz[i * m_avail + r] * Pzz_inv[r * m_avail + j];
     }
 
-  float innov[4];
+  float innov[M];
   for (int i = 0; i < m_avail; i++)
     innov[i] = z_avail[i] - z_pred_avail[i];
   float corr[N_MAX];

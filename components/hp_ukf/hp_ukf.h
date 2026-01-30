@@ -71,6 +71,10 @@ class HpUkfComponent : public PollingComponent {
   void set_outlet_enthalpy_sensor(sensor::Sensor *s) { outlet_enthalpy_ = s; }
   void set_outlet_humidity_ratio_sensor(sensor::Sensor *s) { outlet_humidity_ratio_ = s; }
 
+  void set_air_flow_sensor(sensor::Sensor *s) { air_flow_ = s; }
+  void set_filtered_air_flow_sensor(sensor::Sensor *s) { filtered_air_flow_ = s; }
+  void set_delivered_power_sensor(sensor::Sensor *s) { delivered_power_ = s; }
+
  protected:
   sensor::Sensor *inlet_temperature_{nullptr};
   sensor::Sensor *inlet_humidity_{nullptr};
@@ -118,6 +122,10 @@ class HpUkfComponent : public PollingComponent {
   sensor::Sensor *outlet_dew_point_{nullptr};
   sensor::Sensor *outlet_enthalpy_{nullptr};
   sensor::Sensor *outlet_humidity_ratio_{nullptr};
+
+  sensor::Sensor *air_flow_{nullptr};
+  sensor::Sensor *filtered_air_flow_{nullptr};
+  sensor::Sensor *delivered_power_{nullptr};
 
   HpUkfFilter filter_;
   uint32_t last_update_ms_{0};

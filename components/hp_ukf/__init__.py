@@ -62,6 +62,9 @@ CONF_OUTLET_ABSOLUTE_HUMIDITY = "outlet_absolute_humidity"
 CONF_OUTLET_DEW_POINT = "outlet_dew_point"
 CONF_OUTLET_ENTHALPY = "outlet_enthalpy"
 CONF_OUTLET_HUMIDITY_RATIO = "outlet_humidity_ratio"
+CONF_AIR_FLOW = "air_flow"
+CONF_FILTERED_AIR_FLOW = "filtered_air_flow"
+CONF_DELIVERED_POWER = "delivered_power"
 
 
 def _em_lambda(value):
@@ -276,8 +279,28 @@ CONFIG_SCHEMA = cv.Schema(
             device_class=DEVICE_CLASS_HUMIDITY,
             state_class=STATE_CLASS_MEASUREMENT,
         ),
+        cv.Optional(CONF_AIR_FLOW): cv.use_id(sensor.Sensor),
+        cv.Optional(CONF_FILTERED_AIR_FLOW): sensor.sensor_schema(
+            unit_of_measurement="L/s",
+            accuracy_decimals=2,
+            state_class=STATE_CLASS_MEASUREMENT,
+        ),
+        cv.Optional(CONF_DELIVERED_POWER): sensor.sensor_schema(
+            unit_of_measurement="kW",
+            accuracy_decimals=3,
+            state_class=STATE_CLASS_MEASUREMENT,
+        ),
     }
 ).extend(cv.COMPONENT_SCHEMA)
+
+
+def _validate_air_flow_deps(config):
+    if (CONF_FILTERED_AIR_FLOW in config or CONF_DELIVERED_POWER in config) and CONF_AIR_FLOW not in config:
+        raise cv.Invalid("filtered_air_flow and delivered_power require air_flow to be set")
+    return config
+
+
+CONFIG_SCHEMA = cv.All(CONFIG_SCHEMA, _validate_air_flow_deps)
 
 
 async def to_code(config):
@@ -297,6 +320,9 @@ async def to_code(config):
     if CONF_OUTLET_HUMIDITY in config:
         sens = await cg.get_variable(config[CONF_OUTLET_HUMIDITY])
         cg.add(var.set_outlet_humidity_sensor(sens))
+    if CONF_AIR_FLOW in config:
+        sens = await cg.get_variable(config[CONF_AIR_FLOW])
+        cg.add(var.set_air_flow_sensor(sens))
 
     cg.add(var.set_em_autotune(config[CONF_EM_AUTOTUNE]))
     cg.add(var.set_em_lambda_q(config[CONF_EM_LAMBDA_Q]))
@@ -391,3 +417,9 @@ async def to_code(config):
     if CONF_OUTLET_HUMIDITY_RATIO in config:
         sens = await sensor.new_sensor(config[CONF_OUTLET_HUMIDITY_RATIO])
         cg.add(var.set_outlet_humidity_ratio_sensor(sens))
+    if CONF_FILTERED_AIR_FLOW in config:
+        sens = await sensor.new_sensor(config[CONF_FILTERED_AIR_FLOW])
+        cg.add(var.set_filtered_air_flow_sensor(sens))
+    if CONF_DELIVERED_POWER in config:
+        sens = await sensor.new_sensor(config[CONF_DELIVERED_POWER])
+        cg.add(var.set_delivered_power_sensor(sens))
