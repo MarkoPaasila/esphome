@@ -57,8 +57,20 @@ sensor:
     update_interval: 1s
     lambda: |-
       return 45.0f;
+  # Optional: air flow in L/s (liters per second). When set, UKF also tracks
+  # air flow and delivers filtered_air_flow and delivered_power (kW).
+  - platform: template
+    id: air_flow
+    name: "${name} Air Flow"
+    unit_of_measurement: "L/s"
+    state_class: measurement
+    accuracy_decimals: 2
+    update_interval: 1s
+    lambda: |-
+      return 100.0f;
 
 # HP-UKF component: user provides the four sensors; UKF runs at update_interval.
+# Optional: air_flow (L/s) adds air flow and delivered power to UKF state.
 # Optional: EM auto-tune adapts process (Q) and measurement (R) noise with
 # separate forgetting factors for inlet (slower) vs outlet (faster dynamics).
 hp_ukf:
@@ -68,6 +80,12 @@ hp_ukf:
   inlet_humidity: inlet_humidity
   outlet_temperature: outlet_temperature
   outlet_humidity: outlet_humidity
+  # Optional: air flow sensor in L/s; enables filtered_air_flow and delivered_power
+  air_flow: air_flow
+  filtered_air_flow:
+    name: "${name} Filtered Air Flow"
+  delivered_power:
+    name: "${name} Delivered Power"
   track_temperature_derivatives: true
   em_autotune: true
   em_lambda_q: 0.995
@@ -83,4 +101,5 @@ hp_ukf:
 # The component exposes: Filtered Inlet/Outlet Temperature and Humidity,
 # and (if track_temperature_derivatives is true) Filtered Inlet/Outlet
 # Temperature Derivative (°C/s) and Filtered Inlet/Outlet Humidity Derivative (%/s).
+# With air_flow set: Filtered Air Flow (L/s) and Delivered Power (kW).
 # With em_autotune, optional sensors for Q/R diagonals and lambdas can be added.

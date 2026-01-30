@@ -72,6 +72,28 @@ static float enthalpy_kj_kg(float T_c, float W_kg_kg) {
   return 1.006f * T_c + W_kg_kg * (2501.0f + 1.86f * T_c);
 }
 
+// Delivered power (kW) from inlet/outlet T/RH, air flow (L/s), and pressure (Pa).
+static float delivered_power_kw(float T_in, float rh_in, float T_out, float rh_out,
+                                float air_flow_L_s, float pressure_pa) {
+  float pv_in = partial_pressure_vapor(T_in, rh_in);
+  float W_in = humidity_ratio_kg_kg(pv_in, pressure_pa);
+  if (!std::isfinite(W_in))
+    return NAN;
+  float h_in = enthalpy_kj_kg(T_in, W_in);
+  float pv_out = partial_pressure_vapor(T_out, rh_out);
+  float W_out = humidity_ratio_kg_kg(pv_out, pressure_pa);
+  if (!std::isfinite(W_out))
+    return NAN;
+  float h_out = enthalpy_kj_kg(T_out, W_out);
+  float T_in_K = T_in + 273.15f;
+  if (T_in_K < 1.0f)
+    T_in_K = 1.0f;
+  float rho = pressure_pa / (287.0f * T_in_K);
+  float air_flow_m3_s = air_flow_L_s / 1000.0f;
+  float m_dot = air_flow_m3_s * rho;
+  return m_dot * (h_out - h_in);
+}
+
 static void publish_psychrometric(float T_c, float rh, float p_pa,
                                   sensor::Sensor *abs_hum, sensor::Sensor *dew, sensor::Sensor *enthalpy,
                                   sensor::Sensor *hum_ratio) {
@@ -104,9 +126,14 @@ static void publish_psychrometric(float T_c, float rh, float p_pa,
 void HpUkfComponent::setup() {
   uint32_t t_setup_start_us = micros();
   ESP_LOGCONFIG(TAG, "Setting up HP-UKF component");
-  filter_.set_state_dimension(track_derivatives_ ? 8 : 4);
+  if (air_flow_ != nullptr) {
+    filter_.set_state_dimension(track_derivatives_ ? 10 : 6);
+    filter_.set_atmospheric_pressure(pressure_pa_);
+  } else {
+    filter_.set_state_dimension(track_derivatives_ ? 8 : 4);
+  }
 
-  float x0[HpUkfFilter::N_MAX] = {20.0f, 50.0f, 20.0f, 50.0f, 0.0f, 0.0f, 0.0f, 0.0f};
+  float x0[HpUkfFilter::N_MAX] = {20.0f, 50.0f, 20.0f, 50.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
   float t_in = read_sensor(inlet_temperature_);
   float rh_in = read_sensor(inlet_humidity_);
   float t_out = read_sensor(outlet_temperature_);
@@ -120,8 +147,15 @@ void HpUkfComponent::setup() {
   if (!std::isnan(rh_out))
     x0[3] = rh_out;
 
-  float P0[HpUkfFilter::N_MAX * HpUkfFilter::N_MAX];
   int n = filter_.get_state_dimension();
+  if (n >= 6 && air_flow_ != nullptr) {
+    float af = read_sensor(air_flow_);
+    x0[4] = std::isfinite(af) ? af : 100.0f;
+    float p_kw = delivered_power_kw(x0[0], x0[1], x0[2], x0[3], x0[4], pressure_pa_);
+    x0[5] = std::isfinite(p_kw) ? p_kw : 0.0f;
+  }
+
+  float P0[HpUkfFilter::N_MAX * HpUkfFilter::N_MAX];
   for (int i = 0; i < n * n; i++)
     P0[i] = 0.0f;
   for (int i = 0; i < n; i++)
@@ -147,15 +181,22 @@ void HpUkfComponent::setup() {
     filtered_outlet_temperature_->publish_state(x[2]);
   if (filtered_outlet_humidity_)
     filtered_outlet_humidity_->publish_state(x[3]);
-  if (track_derivatives_) {
+  if (n >= 6) {
+    if (filtered_air_flow_ && std::isfinite(x[4]))
+      filtered_air_flow_->publish_state(x[4]);
+    if (delivered_power_ && std::isfinite(x[5]))
+      delivered_power_->publish_state(x[5]);
+  }
+  if (track_derivatives_ && n >= 8) {
+    int d0 = (n >= 10) ? 6 : 4;
     if (filtered_inlet_temperature_derivative_)
-      filtered_inlet_temperature_derivative_->publish_state(x[4]);
+      filtered_inlet_temperature_derivative_->publish_state(x[d0 + 0]);
     if (filtered_outlet_temperature_derivative_)
-      filtered_outlet_temperature_derivative_->publish_state(x[5]);
+      filtered_outlet_temperature_derivative_->publish_state(x[d0 + 1]);
     if (filtered_inlet_humidity_derivative_)
-      filtered_inlet_humidity_derivative_->publish_state(x[6]);
+      filtered_inlet_humidity_derivative_->publish_state(x[d0 + 2]);
     if (filtered_outlet_humidity_derivative_)
-      filtered_outlet_humidity_derivative_->publish_state(x[7]);
+      filtered_outlet_humidity_derivative_->publish_state(x[d0 + 3]);
   }
 
   {
@@ -175,7 +216,10 @@ void HpUkfComponent::setup() {
     ESP_LOGD(TAG, "Q/R diagonal (copy to hp_ukf initial config):");
     ESP_LOGD(TAG, "  q_t_in: %.6e  q_rh_in: %.6e  q_t_out: %.6e  q_rh_out: %.6e",
              q_diag[0], q_diag[1], q_diag[2], q_diag[3]);
-    if (n >= 8) {
+    if (n >= 10) {
+      ESP_LOGD(TAG, "  q_dt_in: %.6e  q_dt_out: %.6e  q_drh_in: %.6e  q_drh_out: %.6e",
+               q_diag[6], q_diag[7], q_diag[8], q_diag[9]);
+    } else if (n >= 8) {
       ESP_LOGD(TAG, "  q_dt_in: %.6e  q_dt_out: %.6e  q_drh_in: %.6e  q_drh_out: %.6e",
                q_diag[4], q_diag[5], q_diag[6], q_diag[7]);
     }
@@ -185,7 +229,12 @@ void HpUkfComponent::setup() {
     if (em_q_rh_in_) em_q_rh_in_->publish_state(q_diag[1]);
     if (em_q_t_out_) em_q_t_out_->publish_state(q_diag[2]);
     if (em_q_rh_out_) em_q_rh_out_->publish_state(q_diag[3]);
-    if (n >= 8) {
+    if (n >= 10) {
+      if (em_q_dt_in_) em_q_dt_in_->publish_state(q_diag[6]);
+      if (em_q_dt_out_) em_q_dt_out_->publish_state(q_diag[7]);
+      if (em_q_drh_in_) em_q_drh_in_->publish_state(q_diag[8]);
+      if (em_q_drh_out_) em_q_drh_out_->publish_state(q_diag[9]);
+    } else if (n >= 8) {
       if (em_q_dt_in_) em_q_dt_in_->publish_state(q_diag[4]);
       if (em_q_dt_out_) em_q_dt_out_->publish_state(q_diag[5]);
       if (em_q_drh_in_) em_q_drh_in_->publish_state(q_diag[6]);
@@ -232,8 +281,17 @@ void HpUkfComponent::update() {
   z[1] = read_sensor(inlet_humidity_);
   z[2] = read_sensor(outlet_temperature_);
   z[3] = read_sensor(outlet_humidity_);
-  for (int i = 0; i < HpUkfFilter::M; i++)
-    mask[i] = !std::isnan(z[i]);
+  mask[0] = !std::isnan(z[0]);
+  mask[1] = !std::isnan(z[1]);
+  mask[2] = !std::isnan(z[2]);
+  mask[3] = !std::isnan(z[3]);
+  if (air_flow_ != nullptr) {
+    z[4] = read_sensor(air_flow_);
+    mask[4] = std::isfinite(z[4]);
+  } else {
+    z[4] = 0.0f;
+    mask[4] = false;
+  }
 
   filter_.update(z, mask);
   uint32_t t_end_us = micros();
@@ -254,15 +312,23 @@ void HpUkfComponent::update() {
     filtered_outlet_temperature_->publish_state(x[2]);
   if (filtered_outlet_humidity_ && std::isfinite(x[3]))
     filtered_outlet_humidity_->publish_state(x[3]);
-  if (track_derivatives_) {
-    if (filtered_inlet_temperature_derivative_ && std::isfinite(x[4]))
-      filtered_inlet_temperature_derivative_->publish_state(x[4]);
-    if (filtered_outlet_temperature_derivative_ && std::isfinite(x[5]))
-      filtered_outlet_temperature_derivative_->publish_state(x[5]);
-    if (filtered_inlet_humidity_derivative_ && std::isfinite(x[6]))
-      filtered_inlet_humidity_derivative_->publish_state(x[6]);
-    if (filtered_outlet_humidity_derivative_ && std::isfinite(x[7]))
-      filtered_outlet_humidity_derivative_->publish_state(x[7]);
+  int n = filter_.get_state_dimension();
+  if (n >= 6) {
+    if (filtered_air_flow_ && std::isfinite(x[4]))
+      filtered_air_flow_->publish_state(x[4]);
+    if (delivered_power_ && std::isfinite(x[5]))
+      delivered_power_->publish_state(x[5]);
+  }
+  if (track_derivatives_ && n >= 8) {
+    int d0 = (n >= 10) ? 6 : 4;
+    if (filtered_inlet_temperature_derivative_ && std::isfinite(x[d0 + 0]))
+      filtered_inlet_temperature_derivative_->publish_state(x[d0 + 0]);
+    if (filtered_outlet_temperature_derivative_ && std::isfinite(x[d0 + 1]))
+      filtered_outlet_temperature_derivative_->publish_state(x[d0 + 1]);
+    if (filtered_inlet_humidity_derivative_ && std::isfinite(x[d0 + 2]))
+      filtered_inlet_humidity_derivative_->publish_state(x[d0 + 2]);
+    if (filtered_outlet_humidity_derivative_ && std::isfinite(x[d0 + 3]))
+      filtered_outlet_humidity_derivative_->publish_state(x[d0 + 3]);
   }
 
   if (em_autotune_) {
@@ -281,7 +347,10 @@ void HpUkfComponent::update() {
     ESP_LOGD(TAG, "Q/R diagonal (copy to hp_ukf initial config):");
     ESP_LOGD(TAG, "  q_t_in: %.6e  q_rh_in: %.6e  q_t_out: %.6e  q_rh_out: %.6e",
              q_diag[0], q_diag[1], q_diag[2], q_diag[3]);
-    if (n >= 8) {
+    if (n >= 10) {
+      ESP_LOGD(TAG, "  q_dt_in: %.6e  q_dt_out: %.6e  q_drh_in: %.6e  q_drh_out: %.6e",
+               q_diag[6], q_diag[7], q_diag[8], q_diag[9]);
+    } else if (n >= 8) {
       ESP_LOGD(TAG, "  q_dt_in: %.6e  q_dt_out: %.6e  q_drh_in: %.6e  q_drh_out: %.6e",
                q_diag[4], q_diag[5], q_diag[6], q_diag[7]);
     }
@@ -291,7 +360,12 @@ void HpUkfComponent::update() {
     if (em_q_rh_in_ && std::isfinite(q_diag[1])) em_q_rh_in_->publish_state(q_diag[1]);
     if (em_q_t_out_ && std::isfinite(q_diag[2])) em_q_t_out_->publish_state(q_diag[2]);
     if (em_q_rh_out_ && std::isfinite(q_diag[3])) em_q_rh_out_->publish_state(q_diag[3]);
-    if (n >= 8) {
+    if (n >= 10) {
+      if (em_q_dt_in_ && std::isfinite(q_diag[6])) em_q_dt_in_->publish_state(q_diag[6]);
+      if (em_q_dt_out_ && std::isfinite(q_diag[7])) em_q_dt_out_->publish_state(q_diag[7]);
+      if (em_q_drh_in_ && std::isfinite(q_diag[8])) em_q_drh_in_->publish_state(q_diag[8]);
+      if (em_q_drh_out_ && std::isfinite(q_diag[9])) em_q_drh_out_->publish_state(q_diag[9]);
+    } else if (n >= 8) {
       if (em_q_dt_in_ && std::isfinite(q_diag[4])) em_q_dt_in_->publish_state(q_diag[4]);
       if (em_q_dt_out_ && std::isfinite(q_diag[5])) em_q_dt_out_->publish_state(q_diag[5]);
       if (em_q_drh_in_ && std::isfinite(q_diag[6])) em_q_drh_in_->publish_state(q_diag[6]);
@@ -325,6 +399,7 @@ void HpUkfComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "  Inlet humidity sensor: %s", inlet_humidity_ ? "set" : "not set");
   ESP_LOGCONFIG(TAG, "  Outlet temperature sensor: %s", outlet_temperature_ ? "set" : "not set");
   ESP_LOGCONFIG(TAG, "  Outlet humidity sensor: %s", outlet_humidity_ ? "set" : "not set");
+  ESP_LOGCONFIG(TAG, "  Air flow sensor (L/s): %s", air_flow_ ? "set" : "not set");
   ESP_LOGCONFIG(TAG, "  Atmospheric pressure: %.2f hPa", pressure_pa_ / 100.0f);
   ESP_LOGCONFIG(TAG, "  EM auto-tune: %s", em_autotune_ ? "enabled" : "disabled");
   if (em_autotune_) {

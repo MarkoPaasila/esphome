@@ -4,19 +4,25 @@ namespace esphome {
 namespace hp_ukf {
 
 // Time-discrete Unscented Kalman Filter for heat pump inlet/outlet state.
-// State (n=8): [T_in, RH_in, T_out, RH_out, dT_in, dT_out, dRH_in, dRH_out].
-// Measurements (m=4): [T_in, RH_in, T_out, RH_out].
-// Supports n=4 (no derivatives) or n=8 (with all derivatives).
+// State layouts:
+//   n=4:  [T_in, RH_in, T_out, RH_out]
+//   n=8:  [T_in, RH_in, T_out, RH_out, dT_in, dT_out, dRH_in, dRH_out]
+//   n=6:  [T_in, RH_in, T_out, RH_out, air_flow_L_s, delivered_power_kW]
+//   n=10: [T_in, RH_in, T_out, RH_out, air_flow_L_s, delivered_power_kW, dT_in, dT_out, dRH_in, dRH_out]
+// Measurements (m=5): [T_in, RH_in, T_out, RH_out, air_flow_L_s] (z[4] used only when air flow sensor configured).
 class HpUkfFilter {
  public:
-  static constexpr int N_MAX = 8;
-  static constexpr int M = 4;
+  static constexpr int N_MAX = 10;
+  static constexpr int M = 5;
 
   HpUkfFilter() = default;
 
-  // Configure state dimension: 4 (no derivatives) or 8 (with dT_in, dT_out, dRH_in, dRH_out).
+  // Configure state dimension: 4, 6, 8, or 10 (see state layout comment above).
   void set_state_dimension(int n);
   int get_state_dimension() const { return n_; }
+
+  // Atmospheric pressure (Pa) for delivered power from air flow and enthalpy. Call when n>=6.
+  void set_atmospheric_pressure(float pa) { pressure_pa_ = pa; }
 
   // Set initial state and covariance. Call once before first predict/update.
   void set_state(const float *x);
@@ -26,7 +32,7 @@ class HpUkfFilter {
   // Time-discrete predict with elapsed time dt in seconds.
   void predict(float dt);
 
-  // Update with measurement z[4] and mask (true = measurement available).
+  // Update with measurement z[M] and mask (true = measurement available).
   void update(const float *z, const bool *mask);
 
   // Current state and covariance (read-only).
@@ -77,6 +83,8 @@ class HpUkfFilter {
   float wc0_{0.0f};
   float wm_{0.0f};
   float wc_{0.0f};
+
+  float pressure_pa_{101325.0f};
 
   void update_weights();
   void state_transition(const float *x_in, float dt, float *x_out) const;
