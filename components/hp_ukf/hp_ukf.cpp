@@ -4,11 +4,27 @@
 #include "esphome/core/log.h"
 #include <cmath>
 #include <algorithm>
+#ifdef USE_ESP32
+#include "esp_system.h"
+#endif
+#ifdef USE_ESP8266
+#include "Esp.h"
+#endif
 
 namespace esphome {
 namespace hp_ukf {
 
 static const char *const TAG = "hp_ukf";
+
+static uint32_t get_free_heap_bytes() {
+#ifdef USE_ESP32
+  return esp_get_free_heap_size();
+#elif defined(USE_ESP8266)
+  return ESP.getFreeHeap();
+#else
+  return 0U;
+#endif
+}
 
 static float read_sensor(sensor::Sensor *s) {
   if (s != nullptr && s->has_state())
@@ -17,6 +33,7 @@ static float read_sensor(sensor::Sensor *s) {
 }
 
 void HpUkfComponent::setup() {
+  uint32_t t_setup_start_us = micros();
   ESP_LOGCONFIG(TAG, "Setting up HP-UKF component");
   filter_.set_state_dimension(track_derivatives_ ? 8 : 4);
 
@@ -85,6 +102,15 @@ void HpUkfComponent::setup() {
     ESP_LOGD(TAG, "setup Q/R diag: q[0]=%.6f q[2]=%.6f r[0]=%.6f r[2]=%.6f",
              q_diag[0], q_diag[2], r_diag[0], r_diag[2]);
     int n = filter_.get_state_dimension();
+    ESP_LOGD(TAG, "Q/R diagonal (copy to hp_ukf initial config):");
+    ESP_LOGD(TAG, "  q_t_in: %.6e  q_rh_in: %.6e  q_t_out: %.6e  q_rh_out: %.6e",
+             q_diag[0], q_diag[1], q_diag[2], q_diag[3]);
+    if (n >= 8) {
+      ESP_LOGD(TAG, "  q_dt_in: %.6e  q_dt_out: %.6e  q_drh_in: %.6e  q_drh_out: %.6e",
+               q_diag[4], q_diag[5], q_diag[6], q_diag[7]);
+    }
+    ESP_LOGD(TAG, "  r_t_in: %.6e  r_rh_in: %.6e  r_t_out: %.6e  r_rh_out: %.6e",
+             r_diag[0], r_diag[1], r_diag[2], r_diag[3]);
     if (em_q_t_in_) em_q_t_in_->publish_state(q_diag[0]);
     if (em_q_rh_in_) em_q_rh_in_->publish_state(q_diag[1]);
     if (em_q_t_out_) em_q_t_out_->publish_state(q_diag[2]);
@@ -104,6 +130,10 @@ void HpUkfComponent::setup() {
     if (em_lambda_r_outlet_sensor_) em_lambda_r_outlet_sensor_->publish_state(em_lambda_r_outlet_);
   }
 
+  uint32_t t_setup_end_us = micros();
+  uint32_t free_heap = get_free_heap_bytes();
+  ESP_LOGD(TAG, "setup: %.2f ms, free_heap %u bytes",
+           (t_setup_end_us - t_setup_start_us) / 1000.0f, (unsigned) free_heap);
   last_update_ms_ = millis();
   initialized_ = true;
 }
@@ -112,11 +142,14 @@ void HpUkfComponent::update() {
   if (this->is_failed() || !initialized_)
     return;
 
+  uint32_t t0_us = micros();
+  uint32_t heap_before = get_free_heap_bytes();
   uint32_t now_ms = millis();
   float dt_s = (now_ms - last_update_ms_) / 1000.0f;
   dt_s = std::max(1e-6f, std::min(dt_s, 3600.0f));
 
   filter_.predict(dt_s);
+  uint32_t t_after_predict_us = micros();
 
   float z[HpUkfFilter::M];
   bool mask[HpUkfFilter::M];
@@ -128,6 +161,11 @@ void HpUkfComponent::update() {
     mask[i] = !std::isnan(z[i]);
 
   filter_.update(z, mask);
+  uint32_t t_end_us = micros();
+  uint32_t heap_after = get_free_heap_bytes();
+  ESP_LOGD(TAG, "update: predict %.2f ms, update %.2f ms, total %.2f ms, free_heap %u -> %u bytes",
+           (t_after_predict_us - t0_us) / 1000.0f, (t_end_us - t_after_predict_us) / 1000.0f,
+           (t_end_us - t0_us) / 1000.0f, (unsigned) heap_before, (unsigned) heap_after);
   last_update_ms_ = now_ms;
 
   const float *x = filter_.get_state();
@@ -164,6 +202,16 @@ void HpUkfComponent::update() {
       s_update_count++;
     }
     int n = filter_.get_state_dimension();
+    // Debug: Q/R diagonal in copy-paste form for use as compile-time initial values
+    ESP_LOGD(TAG, "Q/R diagonal (copy to hp_ukf initial config):");
+    ESP_LOGD(TAG, "  q_t_in: %.6e  q_rh_in: %.6e  q_t_out: %.6e  q_rh_out: %.6e",
+             q_diag[0], q_diag[1], q_diag[2], q_diag[3]);
+    if (n >= 8) {
+      ESP_LOGD(TAG, "  q_dt_in: %.6e  q_dt_out: %.6e  q_drh_in: %.6e  q_drh_out: %.6e",
+               q_diag[4], q_diag[5], q_diag[6], q_diag[7]);
+    }
+    ESP_LOGD(TAG, "  r_t_in: %.6e  r_rh_in: %.6e  r_t_out: %.6e  r_rh_out: %.6e",
+             r_diag[0], r_diag[1], r_diag[2], r_diag[3]);
     if (em_q_t_in_ && std::isfinite(q_diag[0])) em_q_t_in_->publish_state(q_diag[0]);
     if (em_q_rh_in_ && std::isfinite(q_diag[1])) em_q_rh_in_->publish_state(q_diag[1]);
     if (em_q_t_out_ && std::isfinite(q_diag[2])) em_q_t_out_->publish_state(q_diag[2]);
