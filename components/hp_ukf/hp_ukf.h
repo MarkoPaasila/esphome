@@ -79,6 +79,15 @@ class HpUkfComponent : public PollingComponent {
   void set_climate(climate::Climate *c) { climate_ = c; }
   void set_compressor_frequency_sensor(sensor::Sensor *s) { compressor_frequency_ = s; }
   void set_power_sensor(sensor::Sensor *s) { power_sensor_ = s; }
+  void set_outside_temperature_sensor(sensor::Sensor *s) { outside_temperature_ = s; }
+  void set_outside_coil_temperature_before_sensor(sensor::Sensor *s) {
+    outside_coil_temperature_before_ = s;
+  }
+  void set_outside_coil_temperature_after_sensor(sensor::Sensor *s) {
+    outside_coil_temperature_after_ = s;
+  }
+  void set_inside_room_temperature_sensor(sensor::Sensor *s) { inside_room_temperature_ = s; }
+  void set_inside_room_humidity_sensor(sensor::Sensor *s) { inside_room_humidity_ = s; }
 
  protected:
   sensor::Sensor *inlet_temperature_{nullptr};
@@ -135,6 +144,11 @@ class HpUkfComponent : public PollingComponent {
   climate::Climate *climate_{nullptr};
   sensor::Sensor *compressor_frequency_{nullptr};
   sensor::Sensor *power_sensor_{nullptr};
+  sensor::Sensor *outside_temperature_{nullptr};
+  sensor::Sensor *outside_coil_temperature_before_{nullptr};
+  sensor::Sensor *outside_coil_temperature_after_{nullptr};
+  sensor::Sensor *inside_room_temperature_{nullptr};
+  sensor::Sensor *inside_room_humidity_{nullptr};
 
   HpUkfFilter filter_;
   uint32_t last_update_ms_{0};

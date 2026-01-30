@@ -62,6 +62,11 @@ hp_ukf:
 | `climate`                      | climate | (none)  | Optional. Climate entity ID (e.g. heat pump). The component reads **climate action** (OFF, HEATING, COOLING, IDLE, DRYING, FAN) each update and passes it as a control input to the UKF so the predict step can adapt (e.g. force delivered_power to 0 when OFF/IDLE). |
 | `compressor_frequency`         | sensor  | (none)  | Optional. Sensor ID for compressor frequency in **Hz**. When set together with `climate`, the UKF uses it as a control input (e.g. when compressor is 0 Hz and action is OFF/IDLE, delivered_power is forced to 0). With [MitsubishiCN105ESPHome](https://github.com/echavet/MitsubishiCN105ESPHome), give the climate’s `compressor_frequency_sensor` an `id` and reference it here. |
 | `power_sensor`                  | sensor  | (none)  | Optional. Sensor ID for **input power in W** (e.g. from PZEM or CN105 `input_power_sensor`). Power is correlated to compressor speed; when power is below ~10 W the UKF treats it as no delivered power. Used as a control input like climate action and compressor frequency. |
+| `outside_temperature`           | sensor  | (none)  | Optional. Sensor ID for ambient/outside temperature (°C). Passed as UKF control input for process model use. |
+| `outside_coil_temperature_before` | sensor | (none)  | Optional. Sensor ID for outdoor unit pipe temperature before coil/condenser/evaporator (°C). Passed as UKF control input. |
+| `outside_coil_temperature_after`  | sensor | (none)  | Optional. Sensor ID for outdoor unit pipe temperature after coil (°C). Passed as UKF control input. |
+| `inside_room_temperature`      | sensor  | (none)  | Optional. Sensor ID for inside room temperature (°C). Passed as UKF control input. |
+| `inside_room_humidity`         | sensor  | (none)  | Optional. Sensor ID for inside room relative humidity (%). Passed as UKF control input. |
 | `track_temperature_derivatives`| boolean | `true`  | If true, state is 8D or 10D (with air flow: T_in, RH_in, T_out, RH_out, air_flow, delivered_power, dT_in, dT_out, dRH_in, dRH_out); if false, 4D or 6D (no derivatives). |
 | `atmospheric_pressure`        | float   | `1013.25` | Atmospheric pressure in hPa. Used for psychrometric calculations (absolute humidity, enthalpy) and delivered power (density). Range 10–1200 hPa. |
 | `em_autotune`                 | boolean | `false` | Enable EM (Expectation-Maximization) auto-tune for process (Q) and measurement (R) noise with forgetting factors. |
@@ -103,6 +108,18 @@ hp_ukf:
   climate: hp
   compressor_frequency: compressor_freq
   power_sensor: hp_power
+```
+
+**Optional environment/room control inputs**: You can pass outside temperature, outdoor coil pipe temperatures (before/after coil), and inside room temperature and humidity as UKF control inputs. When configured, the component reads these sensors each update and passes the values to the filter; they are stored for process model use (the current process model does not use them yet). Unavailable or unconfigured sensors are passed as NAN. Example:
+
+```yaml
+hp_ukf:
+  # ...
+  outside_temperature: outdoor_temp
+  outside_coil_temperature_before: pipe_before_coil
+  outside_coil_temperature_after: pipe_after_coil
+  inside_room_temperature: room_temp
+  inside_room_humidity: room_humidity
 ```
 
 **Optional psychrometric sensors** (only created if you add the block with a name): computed from filtered inlet/outlet temperature and relative humidity (UKF state); not part of the UKF state. Use `atmospheric_pressure` for absolute humidity and enthalpy. Options: `inlet_absolute_humidity` (g/m³), `inlet_dew_point` (°C), `inlet_enthalpy` (kJ/kg), `inlet_humidity_ratio` (g/kg); `outlet_absolute_humidity`, `outlet_dew_point`, `outlet_enthalpy`, `outlet_humidity_ratio`. Example:

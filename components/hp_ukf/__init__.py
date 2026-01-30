@@ -68,6 +68,11 @@ CONF_DELIVERED_POWER = "delivered_power"
 CONF_CLIMATE = "climate"
 CONF_COMPRESSOR_FREQUENCY = "compressor_frequency"
 CONF_POWER_SENSOR = "power_sensor"
+CONF_OUTSIDE_TEMPERATURE = "outside_temperature"
+CONF_OUTSIDE_COIL_TEMPERATURE_BEFORE = "outside_coil_temperature_before"
+CONF_OUTSIDE_COIL_TEMPERATURE_AFTER = "outside_coil_temperature_after"
+CONF_INSIDE_ROOM_TEMPERATURE = "inside_room_temperature"
+CONF_INSIDE_ROOM_HUMIDITY = "inside_room_humidity"
 
 
 def _em_lambda(value):
@@ -296,6 +301,11 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_CLIMATE): cv.use_id(climate.Climate),
         cv.Optional(CONF_COMPRESSOR_FREQUENCY): cv.use_id(sensor.Sensor),
         cv.Optional(CONF_POWER_SENSOR): cv.use_id(sensor.Sensor),
+        cv.Optional(CONF_OUTSIDE_TEMPERATURE): cv.use_id(sensor.Sensor),
+        cv.Optional(CONF_OUTSIDE_COIL_TEMPERATURE_BEFORE): cv.use_id(sensor.Sensor),
+        cv.Optional(CONF_OUTSIDE_COIL_TEMPERATURE_AFTER): cv.use_id(sensor.Sensor),
+        cv.Optional(CONF_INSIDE_ROOM_TEMPERATURE): cv.use_id(sensor.Sensor),
+        cv.Optional(CONF_INSIDE_ROOM_HUMIDITY): cv.use_id(sensor.Sensor),
     }
 ).extend(cv.COMPONENT_SCHEMA)
 
@@ -338,6 +348,21 @@ async def to_code(config):
     if CONF_POWER_SENSOR in config:
         sens = await cg.get_variable(config[CONF_POWER_SENSOR])
         cg.add(var.set_power_sensor(sens))
+    if CONF_OUTSIDE_TEMPERATURE in config:
+        sens = await cg.get_variable(config[CONF_OUTSIDE_TEMPERATURE])
+        cg.add(var.set_outside_temperature_sensor(sens))
+    if CONF_OUTSIDE_COIL_TEMPERATURE_BEFORE in config:
+        sens = await cg.get_variable(config[CONF_OUTSIDE_COIL_TEMPERATURE_BEFORE])
+        cg.add(var.set_outside_coil_temperature_before_sensor(sens))
+    if CONF_OUTSIDE_COIL_TEMPERATURE_AFTER in config:
+        sens = await cg.get_variable(config[CONF_OUTSIDE_COIL_TEMPERATURE_AFTER])
+        cg.add(var.set_outside_coil_temperature_after_sensor(sens))
+    if CONF_INSIDE_ROOM_TEMPERATURE in config:
+        sens = await cg.get_variable(config[CONF_INSIDE_ROOM_TEMPERATURE])
+        cg.add(var.set_inside_room_temperature_sensor(sens))
+    if CONF_INSIDE_ROOM_HUMIDITY in config:
+        sens = await cg.get_variable(config[CONF_INSIDE_ROOM_HUMIDITY])
+        cg.add(var.set_inside_room_humidity_sensor(sens))
 
     cg.add(var.set_em_autotune(config[CONF_EM_AUTOTUNE]))
     cg.add(var.set_em_lambda_q(config[CONF_EM_LAMBDA_Q]))

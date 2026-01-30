@@ -89,6 +89,12 @@ hp_ukf:
   # climate: hp
   # compressor_frequency: compressor_freq
   # power_sensor: hp_power   # input power in W; correlated to compressor speed
+  # Optional: environment/room control inputs (passed to UKF; stored for process model use)
+  # outside_temperature: outdoor_temp
+  # outside_coil_temperature_before: pipe_before_coil
+  # outside_coil_temperature_after: pipe_after_coil
+  # inside_room_temperature: room_temp
+  # inside_room_humidity: room_humidity
   filtered_air_flow:
     name: "${name} Filtered Air Flow"
   delivered_power:
