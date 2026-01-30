@@ -1,0 +1,284 @@
+# ESPHome External Component Development .gitignore
+
+# ============================================================================
+# ESPHome Build and Runtime Files
+# ============================================================================
+
+# Build directory - contains compiled firmware and intermediate files
+.esphome/
+build/
+.pioenvs/
+.piolibdeps/
+
+# Compiled firmware binaries
+*.bin
+*.elf
+*.map
+
+# ESPHome cache
+.esphome_cache/
+
+# ============================================================================
+# Secrets and Credentials - CRITICAL: Never commit these!
+# ============================================================================
+
+# ESPHome secrets file (contains WiFi passwords, API keys, etc.)
+secrets.yaml
+secrets.yml
+
+# Any file with 'secret' or 'private' in the name
+*secret*
+*private*
+*credentials*
+
+# API keys and tokens
+.env
+.env.local
+*.key
+*.pem
+*.cert
+
+# ============================================================================
+# Python Development
+# ============================================================================
+
+# Virtual environments
+venv/
+env/
+ENV/
+esphome-venv/
+.venv/
+*.egg-info/
+
+# Python cache and compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Distribution / packaging
+dist/
+build/
+*.egg
+.eggs/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# pytest cache
+.pytest_cache/
+.tox/
+.coverage
+.coverage.*
+htmlcov/
+*.cover
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# ============================================================================
+# PlatformIO (ESPHome uses PlatformIO for compilation)
+# ============================================================================
+
+.pio/
+.pioenvs/
+.piolibdeps/
+.clang_complete
+.gcc-flags.json
+platformio.ini
+pio.ini
+
+# ============================================================================
+# IDE and Editor Files
+# ============================================================================
+
+# Visual Studio Code
+.vscode/
+*.code-workspace
+.history/
+
+# Cursor
+.cursor/
+
+# PyCharm / IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+.*.swp
+.*.swo
+
+# Emacs
+\#*\#
+.\#*
+
+# ============================================================================
+# Operating System Files
+# ============================================================================
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+*.stackdump
+
+# Linux
+.directory
+.Trash-*
+.nfs*
+
+# ============================================================================
+# Logs and Temporary Files
+# ============================================================================
+
+# Log files
+*.log
+logs/
+*.log.*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+*.old
+*~
+
+# ============================================================================
+# Testing and Documentation
+# ============================================================================
+
+# Test output
+test-results/
+coverage/
+*.test
+
+# Documentation builds (if using Sphinx or similar)
+docs/_build/
+docs/.doctrees/
+site/
+
+# ============================================================================
+# Device-Specific and Local Configuration
+# ============================================================================
+
+# Device-specific configuration files (optional - include if you have many devices)
+# Uncomment these if you want to track a template but not specific device configs
+# *-device-*.yaml
+# devices/*.yaml
+
+# Local configuration overrides
+local.yaml
+config-local.yaml
+*.local.yaml
+
+# ============================================================================
+# Backup and Archive Files
+# ============================================================================
+
+*.zip
+*.tar.gz
+*.rar
+*.7z
+*.bz2
+
+# ============================================================================
+# Debugging and Profiling
+# ============================================================================
+
+# Core dumps
+core
+core.*
+*.core
+
+# GDB history
+.gdb_history
+
+# ============================================================================
+# Component Development Specific
+# ============================================================================
+
+# Generated documentation
+html/
+latex/
+
+# Compiled Protocol Buffers (if using)
+*.pb.cc
+*.pb.h
+
+# Generated code markers
+.generated
+
+# ============================================================================
+# Optional: Dependency Locks (uncomment if you want reproducible builds)
+# ============================================================================
+
+# Uncomment these if you want to lock dependencies
+# poetry.lock
+# Pipfile.lock
+# requirements.txt.lock
+
+# ============================================================================
+# Custom Component Testing
+# ============================================================================
+
+# Test device configurations (if you keep test configs separate)
+test-configs/
+test_*.yaml
+
+# Simulation files
+*.sim
+
+# ============================================================================
+# Notes and Planning (optional)
+# ============================================================================
+
+# Personal notes - uncomment if you want to ignore these
+# notes/
+# TODO.md
+# NOTES.md
+# scratch/
+
+# ============================================================================
+# IMPORTANT: Files to ALWAYS Include (DO NOT IGNORE)
+# ============================================================================
+
+# Make sure these are tracked:
+# !custom_components/**/*.py
+# !custom_components/**/*.h
+# !custom_components/**/*.cpp
+# !custom_components/**/*.c
+# !README.md
+# !LICENSE
+# !example-config.yaml
+# !template-config.yaml

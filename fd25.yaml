@@ -1,0 +1,178 @@
+substitutions:
+  name: "fd25"
+  dallas_pin: '19'
+
+esp32:
+  variant: ESP32
+
+
+esphome:
+  compile_process_limit: 2
+
+packages:
+  - !include z-basics.yaml
+
+wifi:
+  use_address: 10.0.0.231
+
+external_components:
+  - source: github://echavet/MitsubishiCN105ESPHome
+    refresh: 0s
+ # - source:
+ #     type: git
+ #     url: https://github.com/MarkoPaasila/esphome-snippets
+ #     ref: hp-ukf
+ #   components: [ hp_ukf ]
+ #   refresh: 0s
+  - source:
+      type: local
+      path: components
+    components: [ hp_ukf ]
+    refresh: 0s
+
+hp_ukf:
+  id: ukf
+  update_interval: 1s
+  inlet_temperature: tin
+  inlet_humidity: hin
+  outlet_temperature: tout
+  outlet_humidity: hout
+  track_temperature_derivatives: true
+  em_autotune: true
+  em_lambda_q: 0.995
+  em_lambda_r_inlet: 0.998
+  em_lambda_r_outlet: 0.98
+  # Optional: expose tuned Q/R and lambdas as sensors (for verification/debug)
+  em_q_t_out:
+    name: "${name} EM Q T Out"
+  em_r_t_out:
+    name: "${name} EM R T Out"
+  em_q_t_in:
+    name: "${name} EM Q T In"
+  em_r_t_in:
+    name: "${name} EM R T In"
+  em_q_rh_in:
+    name: "${name} EM Q RH In"
+  em_r_rh_in:
+    name: "${name} EM R RH In"
+  em_q_rh_out:
+    name: "${name} EM Q RH Out"
+  em_r_rh_out:
+    name: "${name} EM R RH Out"
+
+climate:
+  - platform: cn105
+    id: hp
+    name: MSZ-FD25
+    uart_id: HP_UART
+    update_interval: 1200ms
+    visual:
+      min_temperature: 16.0
+      max_temperature: 31.0
+      temperature_step: 1.0   
+    outside_air_temperature_sensor:
+      name: "Outdoor Temperature Internal"
+    compressor_frequency_sensor:
+      name: "Compressor frequency"
+      filters: { heartbeat: 300s }
+    vertical_vane_select:
+      name: "Vertical Vane Orientation"
+    horizontal_vane_select:
+      name: "Horizontal Vane Orientation"
+    isee_sensor:
+      name: "ISEE Sensor"
+    stage_sensor:
+      name: "Stage Sensor"
+    sub_mode_sensor:
+      name: "Sub Mode Sensor"
+    auto_sub_mode_sensor:
+      name: "Auto Sub Mode Sensor"
+
+one_wire:
+  - platform: gpio
+    pin: $dallas_pin
+
+i2c:
+  - id: i2c1
+    sda: 33
+    scl: 32
+    scan: true
+    frequency: 100kHz
+  - id: i2c0
+    sda: 27
+    scl: 26
+    scan: true
+    frequency: 100kHz
+
+uart:
+#  - id: pzem_uart
+#    tx_pin: 17
+#    rx_pin: 16
+#    baud_rate: 9600
+#    stop_bits: 1
+#    debug:
+  - id: HP_UART
+    tx_pin: 1
+    rx_pin: 3
+    baud_rate: 2400
+
+sensor:      
+# -------------- SHT30 ------------------ #
+  - platform: sht3xd
+    i2c_id: i2c0
+    update_interval: 1s
+    temperature:
+      id: tin
+    humidity:
+      id: hin
+  - platform: sht3xd
+    i2c_id: i2c1
+    update_interval: 1s
+    temperature:
+      id: tout
+    humidity:
+      id: hout
+
+  - platform: debug
+    free:
+      name: "Heap Free"
+      filters:
+        - throttle_average: 60s
+    block:
+      name: "Heap Max Block"
+      filters:
+        - throttle_average: 60s
+    loop_time:
+      name: "Loop Time"
+      filters:
+        - max:
+            window_size: 60
+            send_every: 60
+
+debug:
+  update_interval: 10s
+
+logger:
+  # hardware_uart: UART1 # Uncomment on ESP8266 devices
+  # Global level controls what is compiled in; INFO or DEBUG needed for hp_ukf Q/R logs
+  level: DEBUG
+  logs:
+    hp_ukf: DEBUG
+    EVT_SETS: ERROR
+    WIFI: ERROR
+    MQTT: ERROR
+    WRITE_SETTINGS: ERROR
+    SETTINGS: ERROR
+    STATUS: ERROR
+    # CN105 connection/bootstrap diagnostics (UART init + CONNECT handshake)
+    CN105_CONN: ERROR
+    CN105Climate: WARN
+    CN105: ERROR
+    climate: WARN
+    sensor: WARN
+    chkSum: ERROR
+    WRITE: WARN
+    READ: WARN
+    Header: ERROR
+    Decoder: ERROR
+    CONTROL_WANTED_SETTINGS: ERROR
