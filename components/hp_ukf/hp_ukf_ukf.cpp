@@ -24,6 +24,46 @@ static float enthalpy_kj_kg(float T_c, float W_kg_kg) {
   return 1.006f * T_c + W_kg_kg * (2501.0f + 1.86f * T_c);
 }
 
+// Dew point (°C) from vapor pressure (Pa). Magnus-type inverse.
+static float dew_point_c(float pv_pa) {
+  if (pv_pa <= 1.0f)
+    return NAN;
+  float ln_pv = logf(pv_pa / 610.94f);
+  float denom = 17.625f - ln_pv;
+  if (denom < 0.1f)
+    denom = 0.1f;
+  return 243.04f * ln_pv / denom;
+}
+
+static float outlet_dew_point_c(float T_out, float rh_out) {
+  if (!std::isfinite(T_out) || !std::isfinite(rh_out))
+    return NAN;
+  float pv = (rh_out / 100.0f) * saturation_vapor_pressure_pa(T_out);
+  return dew_point_c(pv);
+}
+
+// Enforce physics: heating → Tvcoil > T_out; cooling → Tvcoil < T_out and Tvcoil < outlet dew point.
+static void clamp_virtual_coil_to_physics(uint8_t action, float T_out, float rh_out, float *Tvcoil) {
+  static constexpr float MARGIN_C = 0.5f;
+  if (!std::isfinite(*Tvcoil))
+    return;
+  if (action == 3) {
+    // HEATING: virtual coil (condenser) must be above outlet air
+    if (std::isfinite(T_out) && *Tvcoil <= T_out)
+      *Tvcoil = T_out + MARGIN_C;
+  } else if (action == 2) {
+    // COOLING: virtual coil (evaporator) must be below outlet air and below outlet dew point
+    if (std::isfinite(T_out)) {
+      float ub = T_out - MARGIN_C;
+      float dew = outlet_dew_point_c(T_out, rh_out);
+      if (std::isfinite(dew) && (dew - MARGIN_C) < ub)
+        ub = dew - MARGIN_C;
+      if (*Tvcoil >= ub)
+        *Tvcoil = ub;
+    }
+  }
+}
+
 static float delivered_power_kw(float T_in, float rh_in, float T_out, float rh_out,
                                 float air_flow_L_s, float pressure_pa) {
   float pv_in = (rh_in / 100.0f) * saturation_vapor_pressure_pa(T_in);
@@ -123,10 +163,11 @@ void HpUkfFilter::get_measurement_noise_diag(float *r_diag) const {
     r_diag[i] = R_[i * M + i];
 }
 
-void HpUkfFilter::set_control_input(uint8_t action, float compressor_freq_hz, float power_kw,
-                                    float T_outside, float T_coil_before, float T_coil_after,
-                                    float T_room, float rh_room) {
+void HpUkfFilter::set_control_input(uint8_t action, uint8_t hp_state, float compressor_freq_hz,
+                                    float power_kw, float T_outside, float T_coil_before,
+                                    float T_coil_after, float T_room, float rh_room) {
   control_action_ = action;
+  control_hp_state_ = hp_state;
   control_compressor_hz_ = compressor_freq_hz;
   control_power_kw_ = power_kw;
   control_T_outside_ = T_outside;
@@ -139,9 +180,14 @@ void HpUkfFilter::set_control_input(uint8_t action, float compressor_freq_hz, fl
 // Threshold below which input power (kW) is treated as "no power" (correlated to compressor off).
 static constexpr float POWER_NO_POWER_THRESHOLD_KW = 0.01f;
 
-// True when control input indicates no heating/cooling power (OFF, IDLE, FAN, DRY, compressor off, or power near 0).
-static bool control_no_power(uint8_t action, float compressor_hz, float power_kw) {
+// HpState codes: 5=DEFROSTING, 6=DEFROST_END, 7=DEFROST_RAMP_UP. 255 = ignore hp_state.
+static constexpr uint8_t HP_STATE_IGNORE = 255;
+
+// True when control input indicates no heating/cooling power (OFF, IDLE, FAN, DRY, defrost, compressor off, or power near 0).
+static bool control_no_power(uint8_t action, uint8_t hp_state, float compressor_hz, float power_kw) {
   if (action == 0 || action == 4 || action == 5 || action == 6)  // OFF, IDLE, DRYING, FAN
+    return true;
+  if (hp_state != HP_STATE_IGNORE && (hp_state == 5 || hp_state == 6 || hp_state == 7))  // DEFROSTING, DEFROST_END, DEFROST_RAMP_UP
     return true;
   if (!std::isfinite(compressor_hz) || compressor_hz <= 0.0f)
     return true;
@@ -176,7 +222,7 @@ static float steady_state_coil_temp_G(bool no_power, uint8_t action, float compr
 }
 
 void HpUkfFilter::state_transition(const float *x_in, float dt, float *x_out) const {
-  bool no_power = control_no_power(control_action_, control_compressor_hz_, control_power_kw_);
+  bool no_power = control_no_power(control_action_, control_hp_state_, control_compressor_hz_, control_power_kw_);
 
   if (n_ >= 11) {
     x_out[0] = x_in[0] + x_in[6] * dt;   // T_in
@@ -201,6 +247,7 @@ void HpUkfFilter::state_transition(const float *x_in, float dt, float *x_out) co
                                        control_T_outside_, control_T_coil_after_, control_T_room_);
     float tau_c = std::max(tau_coil_s_, 1e-3f);
     x_out[10] = x_in[10] + (G - x_in[10]) * (1.0f - expf(-dt / tau_c));
+    clamp_virtual_coil_to_physics(control_action_, x_out[2], x_out[3], &x_out[10]);
     // Do not overwrite T_out with lag toward Tvcoil when tracking derivatives: keep T_out = T_out + dT_out*dt
     // so that the outlet temperature derivative state reflects the actual outlet temperature evolution
     // (corrected by the measurement update). Otherwise dT_out would track Tvcoil dynamics instead of outlet.
@@ -251,6 +298,7 @@ void HpUkfFilter::state_transition(const float *x_in, float dt, float *x_out) co
                                        control_T_outside_, control_T_coil_after_, control_T_room_);
     float tau_c = std::max(tau_coil_s_, 1e-3f);
     x_out[6] = x_in[6] + (G - x_in[6]) * (1.0f - expf(-dt / tau_c));
+    clamp_virtual_coil_to_physics(control_action_, x_out[2], x_out[3], &x_out[6]);
     float tau_a = std::max(tau_outlet_air_s_, 1e-3f);
     x_out[2] = x_out[2] + (x_out[6] - x_out[2]) * (1.0f - expf(-dt / tau_a));
   } else if (n_ >= 6) {
@@ -349,6 +397,10 @@ void HpUkfFilter::predict(float dt) {
   }
   for (int i = 0; i < dim * dim; i++)
     P_[i] = P_pred[i] + Q_[i];
+  if (n_ >= 7) {
+    int tvcoil_idx = (n_ == 7) ? 6 : 10;
+    clamp_virtual_coil_to_physics(control_action_, x_[2], x_[3], &x_[tvcoil_idx]);
+  }
 }
 
 void HpUkfFilter::update(const float *z, const bool *mask) {
@@ -536,6 +588,10 @@ void HpUkfFilter::update(const float *z, const bool *mask) {
       if (Q_[j * dim + j] < Q_MIN)
         Q_[j * dim + j] = Q_MIN;
     }
+  }
+  if (n_ >= 7) {
+    int tvcoil_idx = (n_ == 7) ? 6 : 10;
+    clamp_virtual_coil_to_physics(control_action_, x_[2], x_[3], &x_[tvcoil_idx]);
   }
 }
 

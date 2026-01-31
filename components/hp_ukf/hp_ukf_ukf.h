@@ -45,11 +45,14 @@ class HpUkfFilter {
   // Time-discrete predict with elapsed time dt in seconds.
   void predict(float dt);
 
-  // Control input: set before predict(). action: 0=OFF, 2=COOLING, 3=HEATING, 4=IDLE, 5=DRYING, 6=FAN (matches ClimateAction).
-  // compressor_freq_hz: Hz or 0/NaN when unknown. power_kw: input power in kW (NaN when not configured); correlated to compressor speed.
-  // T_outside, T_coil_before, T_coil_after, T_room in °C; rh_room in %. NAN = not available. Stored for process model use.
-  void set_control_input(uint8_t action, float compressor_freq_hz, float power_kw, float T_outside,
-                         float T_coil_before, float T_coil_after, float T_room, float rh_room);
+  // Control input: set before predict(). action: 0=OFF, 2=COOLING, 3=HEATING, 4=IDLE, 5=DRYING, 6=FAN (ClimateAction).
+  // hp_state: inferred HpState code (0=OFF, 1=FAN_ONLY, 2=HEATING_IDLE, 3=HEATING_RAMP_UP, 4=HEATING_ACTIVE,
+  //   5=DEFROSTING, 6=DEFROST_END, 7=DEFROST_RAMP_UP, 8=COOLING_IDLE, 9=COOLING_RAMP_UP, 10=COOLING_ACTIVE,
+  //   11=STABILIZING, 12=UNKNOWN). Use 255 to ignore hp_state (e.g. state machine not run).
+  // compressor_freq_hz: Hz or 0/NaN when unknown. power_kw: input power in kW (NaN when not configured).
+  // T_outside, T_coil_before, T_coil_after, T_room in °C; rh_room in %. NAN = not available.
+  void set_control_input(uint8_t action, uint8_t hp_state, float compressor_freq_hz, float power_kw,
+                         float T_outside, float T_coil_before, float T_coil_after, float T_room, float rh_room);
 
   // Update with measurement z[M] and mask (true = measurement available).
   void update(const float *z, const bool *mask);
@@ -109,6 +112,7 @@ class HpUkfFilter {
   float tau_outlet_air_s_{20.0f};      // s; outlet air lag toward Tvcoil (n>=7)
 
   uint8_t control_action_{0};
+  uint8_t control_hp_state_{255};  // 255 = ignore (state machine not run)
   float control_compressor_hz_{0.0f};
   float control_power_kw_{0.0f};  // NaN when not configured
   float control_T_outside_{0.0f};  // °C, NAN when not available
