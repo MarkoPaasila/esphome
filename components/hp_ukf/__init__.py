@@ -65,6 +65,12 @@ CONF_OUTLET_HUMIDITY_RATIO = "outlet_humidity_ratio"
 CONF_AIR_FLOW = "air_flow"
 CONF_FILTERED_AIR_FLOW = "filtered_air_flow"
 CONF_DELIVERED_POWER = "delivered_power"
+CONF_DELIVERED_POWER_LAG = "delivered_power_lag"
+CONF_DELIVERED_POWER_LAG_TAU_S = "delivered_power_lag_tau_s"
+CONF_VIRTUAL_COIL = "virtual_coil"
+CONF_COIL_TAU_S = "coil_tau_s"
+CONF_OUTLET_AIR_TAU_S = "outlet_air_tau_s"
+CONF_FILTERED_VIRTUAL_COIL_TEMPERATURE = "filtered_virtual_coil_temperature"
 CONF_CLIMATE = "climate"
 CONF_COMPRESSOR_FREQUENCY = "compressor_frequency"
 CONF_POWER_SENSOR = "power_sensor"
@@ -298,6 +304,24 @@ CONFIG_SCHEMA = cv.Schema(
             accuracy_decimals=3,
             state_class=STATE_CLASS_MEASUREMENT,
         ),
+        cv.Optional(CONF_DELIVERED_POWER_LAG): sensor.sensor_schema(
+            unit_of_measurement="kW",
+            accuracy_decimals=3,
+            state_class=STATE_CLASS_MEASUREMENT,
+        ),
+        cv.Optional(CONF_DELIVERED_POWER_LAG_TAU_S, default=30.0): cv.float_range(min=0.0),
+        cv.Optional(CONF_VIRTUAL_COIL, default=False): cv.boolean,
+        cv.Optional(CONF_COIL_TAU_S, default=60.0): cv.float_range(min=0.1),
+        cv.Optional(CONF_OUTLET_AIR_TAU_S, default=20.0): cv.float_range(min=0.1),
+        cv.Optional(
+            CONF_FILTERED_VIRTUAL_COIL_TEMPERATURE,
+            default={CONF_NAME: "Filtered Virtual Coil Temperature"},
+        ): sensor.sensor_schema(
+            unit_of_measurement=UNIT_CELSIUS,
+            accuracy_decimals=2,
+            device_class=DEVICE_CLASS_TEMPERATURE,
+            state_class=STATE_CLASS_MEASUREMENT,
+        ),
         cv.Optional(CONF_CLIMATE): cv.use_id(climate.Climate),
         cv.Optional(CONF_COMPRESSOR_FREQUENCY): cv.use_id(sensor.Sensor),
         cv.Optional(CONF_POWER_SENSOR): cv.use_id(sensor.Sensor),
@@ -311,8 +335,15 @@ CONFIG_SCHEMA = cv.Schema(
 
 
 def _validate_air_flow_deps(config):
-    if (CONF_FILTERED_AIR_FLOW in config or CONF_DELIVERED_POWER in config) and CONF_AIR_FLOW not in config:
-        raise cv.Invalid("filtered_air_flow and delivered_power require air_flow to be set")
+    need_air_flow = (
+        CONF_FILTERED_AIR_FLOW in config
+        or CONF_DELIVERED_POWER in config
+        or CONF_DELIVERED_POWER_LAG in config
+    )
+    if need_air_flow and CONF_AIR_FLOW not in config:
+        raise cv.Invalid(
+            "filtered_air_flow, delivered_power and delivered_power_lag require air_flow to be set"
+        )
     return config
 
 
@@ -339,6 +370,11 @@ async def to_code(config):
     if CONF_AIR_FLOW in config:
         sens = await cg.get_variable(config[CONF_AIR_FLOW])
         cg.add(var.set_air_flow_sensor(sens))
+        cg.add(var.set_delivered_power_lag_tau_s(config[CONF_DELIVERED_POWER_LAG_TAU_S]))
+        if config.get(CONF_VIRTUAL_COIL, False):
+            cg.add(var.set_virtual_coil(True))
+            cg.add(var.set_coil_tau_s(config[CONF_COIL_TAU_S]))
+            cg.add(var.set_outlet_air_tau_s(config[CONF_OUTLET_AIR_TAU_S]))
     if CONF_CLIMATE in config:
         clim = await cg.get_variable(config[CONF_CLIMATE])
         cg.add(var.set_climate(clim))
@@ -387,6 +423,8 @@ async def to_code(config):
     cg.add(var.set_filtered_inlet_humidity_derivative_sensor(sens))
     sens = await sensor.new_sensor(config[CONF_FILTERED_OUTLET_HUMIDITY_DERIVATIVE])
     cg.add(var.set_filtered_outlet_humidity_derivative_sensor(sens))
+    sens = await sensor.new_sensor(config[CONF_FILTERED_VIRTUAL_COIL_TEMPERATURE])
+    cg.add(var.set_filtered_virtual_coil_temperature_sensor(sens))
 
     if CONF_EM_Q_T_IN in config:
         sens = await sensor.new_sensor(config[CONF_EM_Q_T_IN])
@@ -463,3 +501,6 @@ async def to_code(config):
     if CONF_DELIVERED_POWER in config:
         sens = await sensor.new_sensor(config[CONF_DELIVERED_POWER])
         cg.add(var.set_delivered_power_sensor(sens))
+    if CONF_DELIVERED_POWER_LAG in config:
+        sens = await sensor.new_sensor(config[CONF_DELIVERED_POWER_LAG])
+        cg.add(var.set_delivered_power_lag_sensor(sens))

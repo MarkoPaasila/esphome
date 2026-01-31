@@ -36,7 +36,7 @@ external_components:
 
 hp_ukf:
   id: ukf
-  update_interval: 1s
+  update_interval: 5s
   climate: hp
   inlet_temperature: tin
   inlet_humidity: hin
@@ -50,6 +50,7 @@ hp_ukf:
   inside_room_temperature: indoor_temp
   inside_room_humidity: indoor_humidity
   # atmospheric_pressure: atmospheric_pressure
+  virtual_coil: true
   track_temperature_derivatives: true
   em_autotune: true
   em_inflation: 1.0
@@ -89,6 +90,8 @@ hp_ukf:
     name: "${name} Filtered Air Flow"
   delivered_power:
     name: "${name} Delivered Power"
+  filtered_virtual_coil_temperature:
+    name: "${name} Virtual Coil Temperature"
 
 climate:
   - platform: cn105
@@ -152,14 +155,14 @@ sensor:
 # -------------- SHT30 ------------------ #
   - platform: sht3xd
     i2c_id: i2c0
-    update_interval: 1s
+    update_interval: 5s
     temperature:
       id: tin
     humidity:
       id: hin
   - platform: sht3xd
     i2c_id: i2c1
-    update_interval: 1s
+    update_interval: 5s
     temperature:
       id: tout
     humidity:
@@ -179,12 +182,15 @@ sensor:
     device_class: temperature
     state_class: measurement
   - id: indoor_temp
+    name: "Indoor temperature"
     platform: homeassistant
     entity_id: sensor.bme280_1_bme280_temperature
   - id: indoor_humidity
+    name: "Indoor humidity"
     platform: homeassistant
     entity_id: sensor.bme280_1_bme280_humidity
   - id: atmospheric_pressure
+    name: "Atmospheric pressure"
     platform: homeassistant
     entity_id: sensor.bme280_1_bme280_pressure
 
@@ -221,7 +227,7 @@ sensor:
 
 # ----------------- PZEM ------------------ #
   - platform: pzemac
-    update_interval: 10s
+    update_interval: 5s
     modbus_id: mbus
     power:
       name: "Power"

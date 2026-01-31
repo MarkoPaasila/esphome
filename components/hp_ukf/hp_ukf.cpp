@@ -129,8 +129,13 @@ void HpUkfComponent::setup() {
   uint32_t t_setup_start_us = micros();
   ESP_LOGCONFIG(TAG, "Setting up HP-UKF component");
   if (air_flow_ != nullptr) {
-    filter_.set_state_dimension(track_derivatives_ ? 10 : 6);
+    filter_.set_state_dimension(virtual_coil_ ? (track_derivatives_ ? 11 : 7) : (track_derivatives_ ? 10 : 6));
     filter_.set_atmospheric_pressure(pressure_pa_);
+    filter_.set_delivered_power_lag_tau_s(delivered_power_lag_tau_s_);
+    if (virtual_coil_) {
+      filter_.set_coil_tau_s(coil_tau_s_);
+      filter_.set_outlet_air_tau_s(outlet_air_tau_s_);
+    }
   } else {
     filter_.set_state_dimension(track_derivatives_ ? 8 : 4);
   }
@@ -155,6 +160,17 @@ void HpUkfComponent::setup() {
     x0[4] = std::isfinite(af) ? af : 100.0f;
     float p_kw = delivered_power_kw(x0[0], x0[1], x0[2], x0[3], x0[4], pressure_pa_);
     x0[5] = std::isfinite(p_kw) ? p_kw : 0.0f;
+  }
+  if (n >= 7) {
+    int tvcoil_idx = n - 1;
+    float T_coil_after = read_sensor(outside_coil_temperature_after_);
+    float T_outside = read_sensor(outside_temperature_);
+    if (std::isfinite(T_coil_after))
+      x0[tvcoil_idx] = T_coil_after;
+    else if (std::isfinite(T_outside))
+      x0[tvcoil_idx] = T_outside;
+    else
+      x0[tvcoil_idx] = x0[2];
   }
 
   float P0[HpUkfFilter::N_MAX * HpUkfFilter::N_MAX];
@@ -188,7 +204,11 @@ void HpUkfComponent::setup() {
       filtered_air_flow_->publish_state(x[4]);
     if (delivered_power_ && std::isfinite(x[5]))
       delivered_power_->publish_state(x[5]);
+    if (delivered_power_lag_ && std::isfinite(x[5]))
+      delivered_power_lag_->publish_state(x[5]);
   }
+  if (n >= 7 && filtered_virtual_coil_temperature_ && std::isfinite(x[n - 1]))
+    filtered_virtual_coil_temperature_->publish_state(x[n - 1]);
   if (track_derivatives_ && n >= 8) {
     int d0 = (n >= 10) ? 6 : 4;
     if (filtered_inlet_temperature_derivative_)
@@ -225,6 +245,8 @@ void HpUkfComponent::setup() {
       ESP_LOGD(TAG, "  q_dt_in: %.6e  q_dt_out: %.6e  q_drh_in: %.6e  q_drh_out: %.6e",
                q_diag[4], q_diag[5], q_diag[6], q_diag[7]);
     }
+    if (n >= 7)
+      ESP_LOGD(TAG, "  q_tvcoil: %.6e", q_diag[n - 1]);
     ESP_LOGD(TAG, "  r_t_in: %.6e  r_rh_in: %.6e  r_t_out: %.6e  r_rh_out: %.6e",
              r_diag[0], r_diag[1], r_diag[2], r_diag[3]);
     if (em_q_t_in_) em_q_t_in_->publish_state(q_diag[0]);
@@ -295,6 +317,9 @@ void HpUkfComponent::update() {
   float T_coil_after = read_sensor(outside_coil_temperature_after_);
   float T_room = read_sensor(inside_room_temperature_);
   float rh_room = read_sensor(inside_room_humidity_);
+  if (std::isfinite(T_room) || std::isfinite(rh_room)) {
+    ESP_LOGD(TAG, "Indoor T_room=%.2f °C rh_room=%.1f %%", T_room, rh_room);
+  }
   filter_.set_control_input(action, compressor_hz, power_kw, T_outside, T_coil_before, T_coil_after,
                             T_room, rh_room);
 
@@ -344,7 +369,11 @@ void HpUkfComponent::update() {
       filtered_air_flow_->publish_state(x[4]);
     if (delivered_power_ && std::isfinite(x[5]))
       delivered_power_->publish_state(x[5]);
+    if (delivered_power_lag_ && std::isfinite(x[5]))
+      delivered_power_lag_->publish_state(x[5]);
   }
+  if (n >= 7 && filtered_virtual_coil_temperature_ && std::isfinite(x[n - 1]))
+    filtered_virtual_coil_temperature_->publish_state(x[n - 1]);
   if (track_derivatives_ && n >= 8) {
     int d0 = (n >= 10) ? 6 : 4;
     if (filtered_inlet_temperature_derivative_ && std::isfinite(x[d0 + 0]))
@@ -380,6 +409,8 @@ void HpUkfComponent::update() {
       ESP_LOGD(TAG, "  q_dt_in: %.6e  q_dt_out: %.6e  q_drh_in: %.6e  q_drh_out: %.6e",
                q_diag[4], q_diag[5], q_diag[6], q_diag[7]);
     }
+    if (n >= 7)
+      ESP_LOGD(TAG, "  q_tvcoil: %.6e", q_diag[n - 1]);
     ESP_LOGD(TAG, "  r_t_in: %.6e  r_rh_in: %.6e  r_t_out: %.6e  r_rh_out: %.6e",
              r_diag[0], r_diag[1], r_diag[2], r_diag[3]);
     if (em_q_t_in_ && std::isfinite(q_diag[0])) em_q_t_in_->publish_state(q_diag[0]);
@@ -429,6 +460,8 @@ void HpUkfComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "  Climate (action input): %s", climate_ ? "set" : "not set");
   ESP_LOGCONFIG(TAG, "  Compressor frequency sensor (Hz): %s", compressor_frequency_ ? "set" : "not set");
   ESP_LOGCONFIG(TAG, "  Power sensor (W, control input): %s", power_sensor_ ? "set" : "not set");
+  ESP_LOGCONFIG(TAG, "  Inside room temperature: %s", inside_room_temperature_ ? "set" : "not set");
+  ESP_LOGCONFIG(TAG, "  Inside room humidity: %s", inside_room_humidity_ ? "set" : "not set");
   ESP_LOGCONFIG(TAG, "  Atmospheric pressure: %.2f hPa", pressure_pa_ / 100.0f);
   ESP_LOGCONFIG(TAG, "  EM auto-tune: %s", em_autotune_ ? "enabled" : "disabled");
   if (em_autotune_) {

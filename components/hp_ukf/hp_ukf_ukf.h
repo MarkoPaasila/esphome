@@ -11,20 +11,31 @@ namespace hp_ukf {
 //   n=8:  [T_in, RH_in, T_out, RH_out, dT_in, dT_out, dRH_in, dRH_out]
 //   n=6:  [T_in, RH_in, T_out, RH_out, air_flow_L_s, delivered_power_kW]
 //   n=10: [T_in, RH_in, T_out, RH_out, air_flow_L_s, delivered_power_kW, dT_in, dT_out, dRH_in, dRH_out]
+//   n=7:  [T_in, RH_in, T_out, RH_out, air_flow_L_s, delivered_power_kW, Tvcoil]  (virtual coil enabled)
+//   n=11: [T_in, RH_in, T_out, RH_out, air_flow_L_s, delivered_power_kW, dT_in, dT_out, dRH_in, dRH_out, Tvcoil]
+//         When n=11, T_out is evolved only as T_out + dT_out*dt (not lagged toward Tvcoil) so dT_out tracks outlet.
 // Measurements (m=5): [T_in, RH_in, T_out, RH_out, air_flow_L_s] (z[4] used only when air flow sensor configured).
 class HpUkfFilter {
  public:
-  static constexpr int N_MAX = 10;
+  static constexpr int N_MAX = 11;
   static constexpr int M = 5;
 
   HpUkfFilter() = default;
 
-  // Configure state dimension: 4, 6, 8, or 10 (see state layout comment above).
+  // Configure state dimension: 4, 6, 7, 8, 10, or 11 (see state layout comment above).
   void set_state_dimension(int n);
   int get_state_dimension() const { return n_; }
 
   // Atmospheric pressure (Pa) for delivered power from air flow and enthalpy. Call when n>=6.
   void set_atmospheric_pressure(float pa) { pressure_pa_ = pa; }
+
+  // First-order lag time constant (s) for delivered power state; 0 = instantaneous. Call when n>=6.
+  void set_delivered_power_lag_tau_s(float s) { tau_delivered_power_s_ = s; }
+
+  // Virtual coil: first-order lag time constant (s) for Tvcoil toward G(f_comp, T_outside). Call when n>=7.
+  void set_coil_tau_s(float s) { tau_coil_s_ = s; }
+  // Outlet air temperature first-order lag toward Tvcoil (s). Call when n>=7.
+  void set_outlet_air_tau_s(float s) { tau_outlet_air_s_ = s; }
 
   // Set initial state and covariance. Call once before first predict/update.
   void set_state(const float *x);
@@ -93,6 +104,9 @@ class HpUkfFilter {
   float wc_{0.0f};
 
   float pressure_pa_{101325.0f};
+  float tau_delivered_power_s_{30.0f};  // s; 0 = instantaneous
+  float tau_coil_s_{60.0f};             // s; virtual coil thermal time constant (n>=7)
+  float tau_outlet_air_s_{20.0f};      // s; outlet air lag toward Tvcoil (n>=7)
 
   uint8_t control_action_{0};
   float control_compressor_hz_{0.0f};

@@ -63,6 +63,7 @@ class HpUkfComponent : public PollingComponent {
   void set_em_lambda_r_outlet_sensor(sensor::Sensor *s) { em_lambda_r_outlet_sensor_ = s; }
 
   void set_atmospheric_pressure(float pa) { pressure_pa_ = pa; }
+  void set_delivered_power_lag_tau_s(float s) { delivered_power_lag_tau_s_ = s; }
   void set_inlet_absolute_humidity_sensor(sensor::Sensor *s) { inlet_absolute_humidity_ = s; }
   void set_inlet_dew_point_sensor(sensor::Sensor *s) { inlet_dew_point_ = s; }
   void set_inlet_enthalpy_sensor(sensor::Sensor *s) { inlet_enthalpy_ = s; }
@@ -75,6 +76,13 @@ class HpUkfComponent : public PollingComponent {
   void set_air_flow_sensor(sensor::Sensor *s) { air_flow_ = s; }
   void set_filtered_air_flow_sensor(sensor::Sensor *s) { filtered_air_flow_ = s; }
   void set_delivered_power_sensor(sensor::Sensor *s) { delivered_power_ = s; }
+  void set_delivered_power_lag_sensor(sensor::Sensor *s) { delivered_power_lag_ = s; }
+  void set_virtual_coil(bool v) { virtual_coil_ = v; }
+  void set_coil_tau_s(float s) { coil_tau_s_ = s; }
+  void set_outlet_air_tau_s(float s) { outlet_air_tau_s_ = s; }
+  void set_filtered_virtual_coil_temperature_sensor(sensor::Sensor *s) {
+    filtered_virtual_coil_temperature_ = s;
+  }
 
   void set_climate(climate::Climate *c) { climate_ = c; }
   void set_compressor_frequency_sensor(sensor::Sensor *s) { compressor_frequency_ = s; }
@@ -140,6 +148,12 @@ class HpUkfComponent : public PollingComponent {
   sensor::Sensor *air_flow_{nullptr};
   sensor::Sensor *filtered_air_flow_{nullptr};
   sensor::Sensor *delivered_power_{nullptr};
+  sensor::Sensor *delivered_power_lag_{nullptr};
+  float delivered_power_lag_tau_s_{30.0f};
+  bool virtual_coil_{false};
+  float coil_tau_s_{60.0f};
+  float outlet_air_tau_s_{20.0f};
+  sensor::Sensor *filtered_virtual_coil_temperature_{nullptr};
 
   climate::Climate *climate_{nullptr};
   sensor::Sensor *compressor_frequency_{nullptr};

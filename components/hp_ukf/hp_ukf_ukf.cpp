@@ -42,7 +42,7 @@ static float delivered_power_kw(float T_in, float rh_in, float T_out, float rh_o
 }
 
 void HpUkfFilter::set_state_dimension(int n) {
-  n_ = (n == 4 || n == 6 || n == 8 || n == 10) ? n : 8;
+  n_ = (n == 4 || n == 6 || n == 7 || n == 8 || n == 10 || n == 11) ? n : 8;
   update_weights();
   for (int i = 0; i < n_ * n_; i++)
     Q_[i] = 0.0f;
@@ -66,6 +66,10 @@ void HpUkfFilter::set_state_dimension(int n) {
     Q_[8 * n_ + 8] = 0.002286525f;   // dRH_in
     Q_[9 * n_ + 9] = 0.005536150f;   // dRH_out
   }
+  if (n_ == 7)
+    Q_[6 * n_ + 6] = 0.02f;   // Tvcoil °C²
+  if (n_ == 11)
+    Q_[10 * n_ + 10] = 0.02f;  // Tvcoil °C²
   for (int i = 0; i < M * M; i++)
     R_[i] = 0.0f;
   R_[0 * M + 0] = 0.0007687177f;  // T_in °C²
@@ -146,20 +150,74 @@ static bool control_no_power(uint8_t action, float compressor_hz, float power_kw
   return false;
 }
 
+// Steady-state indoor coil temperature G(f_comp, T_room/T_outside) for virtual coil dynamics. Returns °C.
+// Tvcoil models the INDOOR coil; do not use T_coil_after (outdoor coil) as G.
+// no_power: indoor coil floats toward T_room (indoor), not T_outside. Otherwise parametric.
+// HEATING: indoor coil is condenser -> hot; use T_room (indoor ref) + K_HEAT*comp so G is above room.
+// COOLING: indoor coil is evaporator -> cold; use T_outside - K_COOL*comp.
+static float steady_state_coil_temp_G(bool no_power, uint8_t action, float compressor_hz,
+                                      float T_outside, float T_coil_after, float T_room) {
+  (void) T_coil_after;  // outdoor coil; not used for indoor Tvcoil target
+  static constexpr float G_MIN_C = -20.0f;
+  static constexpr float G_MAX_C = 60.0f;
+  static constexpr float K_COOL_Hz = 0.3f;   // °C/Hz cooling (indoor evaporator)
+  static constexpr float K_HEAT_Hz = 0.3f;   // °C/Hz heating (indoor condenser above room)
+  if (no_power)
+    return std::isfinite(T_room) ? T_room : (std::isfinite(T_outside) ? T_outside : 20.0f);
+  float T_ref = std::isfinite(T_room) ? T_room : T_outside;
+  float G = T_outside;
+  if (std::isfinite(compressor_hz) && compressor_hz > 0.0f) {
+    if (action == 2)  // COOLING: indoor coil (evaporator) colder with f_comp
+      G = std::isfinite(T_outside) ? (T_outside - K_COOL_Hz * compressor_hz) : (T_ref - K_COOL_Hz * compressor_hz);
+    else if (action == 3)  // HEATING: indoor coil (condenser) hotter than room with f_comp
+      G = T_ref + K_HEAT_Hz * compressor_hz;
+  }
+  return std::max(G_MIN_C, std::min(G_MAX_C, G));
+}
+
 void HpUkfFilter::state_transition(const float *x_in, float dt, float *x_out) const {
   bool no_power = control_no_power(control_action_, control_compressor_hz_, control_power_kw_);
 
-  if (n_ >= 10) {
+  if (n_ >= 11) {
+    x_out[0] = x_in[0] + x_in[6] * dt;   // T_in
+    x_out[1] = x_in[1] + x_in[8] * dt;   // RH_in
+    x_out[2] = x_in[2] + x_in[7] * dt;   // T_out (driven by dT_out only; measurement corrects toward real outlet)
+    x_out[3] = x_in[3] + x_in[9] * dt;   // RH_out
+    x_out[4] = x_in[4];  // air_flow L/s
+    float p_cmd = no_power ? 0.0f : delivered_power_kw(x_out[0], x_out[1], x_out[2], x_out[3], x_out[4], pressure_pa_);
+    if (!std::isfinite(p_cmd))
+      p_cmd = x_in[5];
+    if (tau_delivered_power_s_ <= 0.0f) {
+      x_out[5] = p_cmd;
+    } else {
+      float tau = std::max(tau_delivered_power_s_, 1e-3f);
+      x_out[5] = x_in[5] + (p_cmd - x_in[5]) * (1.0f - expf(-dt / tau));
+    }
+    x_out[6] = x_in[6];
+    x_out[7] = x_in[7];
+    x_out[8] = x_in[8];
+    x_out[9] = x_in[9];
+    float G = steady_state_coil_temp_G(no_power, control_action_, control_compressor_hz_,
+                                       control_T_outside_, control_T_coil_after_, control_T_room_);
+    float tau_c = std::max(tau_coil_s_, 1e-3f);
+    x_out[10] = x_in[10] + (G - x_in[10]) * (1.0f - expf(-dt / tau_c));
+    // Do not overwrite T_out with lag toward Tvcoil when tracking derivatives: keep T_out = T_out + dT_out*dt
+    // so that the outlet temperature derivative state reflects the actual outlet temperature evolution
+    // (corrected by the measurement update). Otherwise dT_out would track Tvcoil dynamics instead of outlet.
+  } else if (n_ >= 10) {
     x_out[0] = x_in[0] + x_in[6] * dt;   // T_in
     x_out[1] = x_in[1] + x_in[8] * dt;   // RH_in
     x_out[2] = x_in[2] + x_in[7] * dt;   // T_out
     x_out[3] = x_in[3] + x_in[9] * dt;   // RH_out
     x_out[4] = x_in[4];  // air_flow L/s
-    if (no_power) {
-      x_out[5] = 0.0f;
+    float p_cmd = no_power ? 0.0f : delivered_power_kw(x_out[0], x_out[1], x_out[2], x_out[3], x_out[4], pressure_pa_);
+    if (!std::isfinite(p_cmd))
+      p_cmd = x_in[5];
+    if (tau_delivered_power_s_ <= 0.0f) {
+      x_out[5] = p_cmd;
     } else {
-      float p_kw = delivered_power_kw(x_out[0], x_out[1], x_out[2], x_out[3], x_out[4], pressure_pa_);
-      x_out[5] = std::isfinite(p_kw) ? p_kw : x_in[5];
+      float tau = std::max(tau_delivered_power_s_, 1e-3f);
+      x_out[5] = x_in[5] + (p_cmd - x_in[5]) * (1.0f - expf(-dt / tau));
     }
     x_out[6] = x_in[6];
     x_out[7] = x_in[7];
@@ -174,17 +232,41 @@ void HpUkfFilter::state_transition(const float *x_in, float dt, float *x_out) co
     x_out[5] = x_in[5];
     x_out[6] = x_in[6];
     x_out[7] = x_in[7];
+  } else if (n_ >= 7) {
+    x_out[0] = x_in[0];
+    x_out[1] = x_in[1];
+    x_out[2] = x_in[2];
+    x_out[3] = x_in[3];
+    x_out[4] = x_in[4];
+    float p_cmd = no_power ? 0.0f : delivered_power_kw(x_out[0], x_out[1], x_out[2], x_out[3], x_out[4], pressure_pa_);
+    if (!std::isfinite(p_cmd))
+      p_cmd = x_in[5];
+    if (tau_delivered_power_s_ <= 0.0f) {
+      x_out[5] = p_cmd;
+    } else {
+      float tau = std::max(tau_delivered_power_s_, 1e-3f);
+      x_out[5] = x_in[5] + (p_cmd - x_in[5]) * (1.0f - expf(-dt / tau));
+    }
+    float G = steady_state_coil_temp_G(no_power, control_action_, control_compressor_hz_,
+                                       control_T_outside_, control_T_coil_after_, control_T_room_);
+    float tau_c = std::max(tau_coil_s_, 1e-3f);
+    x_out[6] = x_in[6] + (G - x_in[6]) * (1.0f - expf(-dt / tau_c));
+    float tau_a = std::max(tau_outlet_air_s_, 1e-3f);
+    x_out[2] = x_out[2] + (x_out[6] - x_out[2]) * (1.0f - expf(-dt / tau_a));
   } else if (n_ >= 6) {
     x_out[0] = x_in[0];
     x_out[1] = x_in[1];
     x_out[2] = x_in[2];
     x_out[3] = x_in[3];
     x_out[4] = x_in[4];
-    if (no_power) {
-      x_out[5] = 0.0f;
+    float p_cmd = no_power ? 0.0f : delivered_power_kw(x_out[0], x_out[1], x_out[2], x_out[3], x_out[4], pressure_pa_);
+    if (!std::isfinite(p_cmd))
+      p_cmd = x_in[5];
+    if (tau_delivered_power_s_ <= 0.0f) {
+      x_out[5] = p_cmd;
     } else {
-      float p_kw = delivered_power_kw(x_out[0], x_out[1], x_out[2], x_out[3], x_out[4], pressure_pa_);
-      x_out[5] = std::isfinite(p_kw) ? p_kw : x_in[5];
+      float tau = std::max(tau_delivered_power_s_, 1e-3f);
+      x_out[5] = x_in[5] + (p_cmd - x_in[5]) * (1.0f - expf(-dt / tau));
     }
   } else {
     x_out[0] = x_in[0];
