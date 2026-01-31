@@ -577,8 +577,6 @@ void HpUkfComponent::update() {
   if (std::isfinite(T_room) || std::isfinite(rh_room)) {
     ESP_LOGD(TAG, "Indoor T_room=%.2f °C rh_room=%.1f %%", T_room, rh_room);
   }
-  filter_.set_control_input(action, compressor_hz, power_kw, T_outside, T_coil_before, T_coil_after,
-                            T_room, rh_room);
 
   float power_w = NAN;
   if (power_sensor_ != nullptr && power_sensor_->has_state()) {
@@ -606,6 +604,11 @@ void HpUkfComponent::update() {
     state_text_sensor_->publish_state(state_to_string(state_));
   if (defrosting_binary_sensor_ != nullptr)
     defrosting_binary_sensor_->publish_state(state_ == HpState::DEFROSTING);
+
+  // Pass inferred state to UKF; use 255 (ignore) when state machine not run (no climate).
+  uint8_t hp_state_ukf = (climate_ != nullptr) ? static_cast<uint8_t>(new_state) : 255;
+  filter_.set_control_input(action, hp_state_ukf, compressor_hz, power_kw, T_outside, T_coil_before,
+                            T_coil_after, T_room, rh_room);
 
   filter_.predict(dt_s);
   uint32_t t_after_predict_us = micros();
