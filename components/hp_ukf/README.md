@@ -81,7 +81,7 @@ hp_ukf:
 
 Optional EM sensors (only created if configured): `em_q_t_in`, `em_q_rh_in`, `em_q_t_out`, `em_q_rh_out`, `em_q_dt_in`, `em_q_dt_out`, `em_q_drh_in`, `em_q_drh_out` (process noise diagonal, variance units); `em_r_t_in`, `em_r_rh_in`, `em_r_t_out`, `em_r_rh_out` (measurement noise diagonal); `em_lambda_q_sensor`, `em_lambda_r_inlet_sensor`, `em_lambda_r_outlet_sensor` (current lambda values for debugging).
 
-**Optional air flow and delivered power** (only when `air_flow` is set): `filtered_air_flow` (L/s) publishes the UKF-filtered air flow; `delivered_power` (kW) publishes the UKF state (delivered power), which by default lags toward the instantaneous P = m_dot × (h_out − h_in) with time constant `delivered_power_lag_tau_s` (set to `0` for no lag). Optional `delivered_power_lag` (kW) also publishes the same lagged UKF state when configured with a name. When `virtual_coil: true`, optional `filtered_virtual_coil_temperature` (°C) publishes the UKF Tvcoil state for logging/debugging. All these sensors require a name. Example:
+**Optional air flow and delivered power** (only when `air_flow` is set): `filtered_air_flow` (L/s) publishes the UKF-filtered air flow; `delivered_power` (W) publishes the UKF state (delivered power), which by default lags toward the instantaneous P = m_dot × (h_out − h_in) with time constant `delivered_power_lag_tau_s` (set to `0` for no lag). Optional `delivered_power_lag` (W) also publishes the same lagged UKF state when configured with a name. When `virtual_coil: true`, optional `filtered_virtual_coil_temperature` (°C) publishes the UKF Tvcoil state for logging/debugging. All these sensors require a name. Example:
 
 ```yaml
 hp_ukf:
@@ -132,6 +132,30 @@ hp_ukf:
   outside_coil_temperature_after: pipe_after_coil
   inside_room_temperature: room_temp
   inside_room_humidity: room_humidity
+```
+
+**State machine** (optional): When `climate`, `power_sensor`, `compressor_frequency`, `inlet_temperature`, and `outlet_temperature` are set, you can optionally add a **state** text_sensor and a **defrosting** binary_sensor. The component then infers heat pump operational state (heating idle/ramp-up/active, defrosting, cooling, etc.) from climate action, input power (W), compressor frequency, and inlet/outlet temperatures. A power histogram (0–`power_max_w` W, `num_bins` bins, decay half-life `histogram_half_life_sec`) provides percentile thresholds: ramp-up → active uses the **50th percentile** (median); defrost detection uses **25th/75th** percentiles. When both UKF filtering and state/defrosting are configured, one component provides both. Options:
+
+| Option                    | Type   | Default | Description |
+|---------------------------|--------|---------|-------------|
+| `state`                   | block  | (none)  | Optional. Text sensor for state string (e.g. `heating_active`, `defrosting`). |
+| `defrosting`              | block  | (none)  | Optional. Binary sensor for defrost on/off. Use e.g. in air-volume templates so flow is low during defrost. |
+| `histogram_half_life_sec` | int    | `600`   | Histogram decay half-life (seconds). |
+| `power_max_w`             | int    | `3500`  | Power range upper bound (W); bins span 0 to this. |
+| `num_bins`                | int    | `35`    | Number of histogram bins (5–100). |
+| `delta_t_margin`           | float  | `1.0`   | Min \|outlet − inlet\| (°C) for “active” heating/cooling. |
+| `compressor_low_hz`       | float  | `5.0`   | Compressor below this (Hz) is treated as off. |
+
+States: `off`, `fan_only`, `heating_idle`, `heating_ramp_up`, `heating_active`, `defrosting`, `defrost_end`, `defrost_ramp_up`, `cooling_idle`, `cooling_ramp_up`, `cooling_active`, `stabilizing`, `unknown`. Ramp-up states (`heating_ramp_up`, `cooling_ramp_up`, `defrost_ramp_up`) are capped at **5 minutes**; after that the state is forced to the corresponding active state. Defrost detection: power was above high (75th percentile), then drops below low (25th) with compressor down; within 2 min power rises with compressor up and outlet &lt; inlet → `defrosting`. Defrost end: while defrosting, power drops from above high to below low within 10 min → `defrost_end`, then `defrost_ramp_up`, then heating states when outlet &gt; inlet.
+
+```yaml
+hp_ukf:
+  # ... climate, power_sensor, compressor_frequency, inlet_temperature, outlet_temperature ...
+  state:
+    name: "${name} HP State"
+  defrosting:
+    id: hp_defrosting
+    name: "${name} Defrosting"
 ```
 
 **Optional psychrometric sensors** (only created if you add the block with a name): computed from filtered inlet/outlet temperature and relative humidity (UKF state); not part of the UKF state. Use `atmospheric_pressure` for absolute humidity and enthalpy. Options: `inlet_absolute_humidity` (g/m³), `inlet_dew_point` (°C), `inlet_enthalpy` (kJ/kg), `inlet_humidity_ratio` (g/kg); `outlet_absolute_humidity`, `outlet_dew_point`, `outlet_enthalpy`, `outlet_humidity_ratio`. Example:

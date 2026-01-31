@@ -58,7 +58,7 @@ sensor:
     lambda: |-
       return 45.0f;
   # Optional: air flow in L/s (liters per second). When set, UKF also tracks
-  # air flow and delivers filtered_air_flow and delivered_power (kW).
+  # air flow and delivers filtered_air_flow and delivered_power (W).
   - platform: template
     id: air_flow
     name: "${name} Air Flow"
@@ -95,6 +95,13 @@ hp_ukf:
   # outside_coil_temperature_after: pipe_after_coil
   # inside_room_temperature: room_temp
   # inside_room_humidity: room_humidity
+  # Optional: heat pump state machine (state text_sensor + defrosting binary_sensor).
+  # Requires climate, power_sensor, compressor_frequency, inlet_temperature, outlet_temperature.
+  # state:
+  #   name: "${name} HP State"
+  # defrosting:
+  #   id: hp_defrosting
+  #   name: "${name} Defrosting"
   filtered_air_flow:
     name: "${name} Filtered Air Flow"
   delivered_power:
@@ -114,5 +121,5 @@ hp_ukf:
 # The component exposes: Filtered Inlet/Outlet Temperature and Humidity,
 # and (if track_temperature_derivatives is true) Filtered Inlet/Outlet
 # Temperature Derivative (°C/s) and Filtered Inlet/Outlet Humidity Derivative (%/s).
-# With air_flow set: Filtered Air Flow (L/s) and Delivered Power (kW).
+# With air_flow set: Filtered Air Flow (L/s) and Delivered Power (W).
 # With em_autotune, optional sensors for Q/R diagonals and lambdas can be added.

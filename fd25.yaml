@@ -92,6 +92,15 @@ hp_ukf:
     name: "${name} Delivered Power"
   filtered_virtual_coil_temperature:
     name: "${name} Virtual Coil Temperature"
+  # Optional: heat pump state machine (state string + defrosting binary)
+  state:
+    name: "${name} HP State"
+  defrosting:
+    id: hp_state_defrosting
+    name: "${name} Defrosting"
+    on_state:
+      - then:
+          - component.update: vol
 
 climate:
   - platform: cn105
@@ -207,7 +216,7 @@ sensor:
       bool heat = (mode == 1 || mode == 3);
       bool cool = (mode == 2 || mode == 4);
       bool off = (mode == 0);
-      bool defrosting = false;  // id(G_state) / ST_DEFROSTING_STARTED not configured
+      bool defrosting = id(hp_state_defrosting).state;
 
       if (cool) {
         if (s == 3){return 76.67;}

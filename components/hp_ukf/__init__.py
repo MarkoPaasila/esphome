@@ -11,9 +11,9 @@ from esphome.const import (
     UNIT_CELSIUS,
     UNIT_PERCENT,
 )
-from esphome.components import climate, sensor
+from esphome.components import climate, sensor, text_sensor, binary_sensor
 
-DEPENDENCIES = ["sensor", "climate"]
+DEPENDENCIES = ["sensor", "climate", "text_sensor", "binary_sensor"]
 
 hp_ukf_ns = cg.esphome_ns.namespace("hp_ukf")
 HpUkfComponent = hp_ukf_ns.class_("HpUkfComponent", cg.PollingComponent)
@@ -79,6 +79,13 @@ CONF_OUTSIDE_COIL_TEMPERATURE_BEFORE = "outside_coil_temperature_before"
 CONF_OUTSIDE_COIL_TEMPERATURE_AFTER = "outside_coil_temperature_after"
 CONF_INSIDE_ROOM_TEMPERATURE = "inside_room_temperature"
 CONF_INSIDE_ROOM_HUMIDITY = "inside_room_humidity"
+CONF_STATE = "state"
+CONF_DEFROSTING = "defrosting"
+CONF_HISTOGRAM_HALF_LIFE_SEC = "histogram_half_life_sec"
+CONF_POWER_MAX_W = "power_max_w"
+CONF_NUM_BINS = "num_bins"
+CONF_DELTA_T_MARGIN = "delta_t_margin"
+CONF_COMPRESSOR_LOW_HZ = "compressor_low_hz"
 
 
 def _em_lambda(value):
@@ -300,13 +307,13 @@ CONFIG_SCHEMA = cv.Schema(
             state_class=STATE_CLASS_MEASUREMENT,
         ),
         cv.Optional(CONF_DELIVERED_POWER): sensor.sensor_schema(
-            unit_of_measurement="kW",
-            accuracy_decimals=3,
+            unit_of_measurement="W",
+            accuracy_decimals=1,
             state_class=STATE_CLASS_MEASUREMENT,
         ),
         cv.Optional(CONF_DELIVERED_POWER_LAG): sensor.sensor_schema(
-            unit_of_measurement="kW",
-            accuracy_decimals=3,
+            unit_of_measurement="W",
+            accuracy_decimals=1,
             state_class=STATE_CLASS_MEASUREMENT,
         ),
         cv.Optional(CONF_DELIVERED_POWER_LAG_TAU_S, default=30.0): cv.float_range(min=0.0),
@@ -330,6 +337,13 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_OUTSIDE_COIL_TEMPERATURE_AFTER): cv.use_id(sensor.Sensor),
         cv.Optional(CONF_INSIDE_ROOM_TEMPERATURE): cv.use_id(sensor.Sensor),
         cv.Optional(CONF_INSIDE_ROOM_HUMIDITY): cv.use_id(sensor.Sensor),
+        cv.Optional(CONF_STATE): text_sensor.text_sensor_schema(),
+        cv.Optional(CONF_DEFROSTING): binary_sensor.binary_sensor_schema(device_class="cold"),
+        cv.Optional(CONF_HISTOGRAM_HALF_LIFE_SEC, default=600): cv.positive_int,
+        cv.Optional(CONF_POWER_MAX_W, default=3500): cv.positive_int,
+        cv.Optional(CONF_NUM_BINS, default=35): cv.int_range(min=5, max=100),
+        cv.Optional(CONF_DELTA_T_MARGIN, default=1.0): cv.float_range(min=0.0, max=10.0),
+        cv.Optional(CONF_COMPRESSOR_LOW_HZ, default=5.0): cv.float_range(min=0.0, max=100.0),
     }
 ).extend(cv.COMPONENT_SCHEMA)
 
@@ -399,6 +413,17 @@ async def to_code(config):
     if CONF_INSIDE_ROOM_HUMIDITY in config:
         sens = await cg.get_variable(config[CONF_INSIDE_ROOM_HUMIDITY])
         cg.add(var.set_inside_room_humidity_sensor(sens))
+    if CONF_STATE in config:
+        state_ts = await text_sensor.new_text_sensor(config[CONF_STATE])
+        cg.add(var.set_state_text_sensor(state_ts))
+    if CONF_DEFROSTING in config:
+        defrost_bs = await binary_sensor.new_binary_sensor(config[CONF_DEFROSTING])
+        cg.add(var.set_defrosting_binary_sensor(defrost_bs))
+    cg.add(var.set_histogram_half_life_sec(config[CONF_HISTOGRAM_HALF_LIFE_SEC]))
+    cg.add(var.set_power_max_w(config[CONF_POWER_MAX_W]))
+    cg.add(var.set_num_bins(config[CONF_NUM_BINS]))
+    cg.add(var.set_delta_t_margin(config[CONF_DELTA_T_MARGIN]))
+    cg.add(var.set_compressor_low_hz(config[CONF_COMPRESSOR_LOW_HZ]))
 
     cg.add(var.set_em_autotune(config[CONF_EM_AUTOTUNE]))
     cg.add(var.set_em_lambda_q(config[CONF_EM_LAMBDA_Q]))
