@@ -125,12 +125,282 @@ static void publish_psychrometric(float T_c, float rh, float p_pa,
   }
 }
 
+<<<<<<< HEAD
 void HpUkfComponent::setup() {
   uint32_t t_setup_start_us = micros();
   ESP_LOGCONFIG(TAG, "Setting up HP-UKF component");
   if (air_flow_ != nullptr) {
     filter_.set_state_dimension(track_derivatives_ ? 10 : 6);
     filter_.set_atmospheric_pressure(pressure_pa_);
+=======
+void HpUkfComponent::update_histogram(float power_w, uint8_t action, bool in_defrost, float t_in,
+                                      float t_out) {
+  uint32_t now = millis();
+  if (num_bins_ <= 0 || num_bins_ > HP_STATE_HISTOGRAM_MAX_BINS)
+    return;
+  float bin_width = (float) power_max_w_ / (float) num_bins_;
+  for (int i = 0; i < num_bins_; i++)
+    histogram_[i] *= HISTOGRAM_DECAY_PER_STEP;
+  last_histogram_update_ms_ = now;
+  if (action != 3)
+    return;
+  if (in_defrost)
+    return;
+  if (std::isfinite(t_in) && std::isfinite(t_out) && t_out < t_in)
+    return;
+  if (!std::isfinite(power_w) || power_w < 0.0f)
+    return;
+  float p = std::min((float) power_max_w_, power_w);
+  int bin = (int) (p / bin_width);
+  if (bin >= num_bins_)
+    bin = num_bins_ - 1;
+  if (bin < 0)
+    bin = 0;
+  histogram_[bin] += 1.0f;
+}
+
+float HpUkfComponent::percentile(float p) {
+  if (num_bins_ <= 0 || num_bins_ > HP_STATE_HISTOGRAM_MAX_BINS)
+    return NAN;
+  float total = 0.0f;
+  for (int i = 0; i < num_bins_; i++)
+    total += histogram_[i];
+  if (total < MIN_TOTAL_COUNT_FOR_PERCENTILE)
+    return NAN;
+  float bin_width = (float) power_max_w_ / (float) num_bins_;
+  float target = p * total;
+  float cum = 0.0f;
+  for (int i = 0; i < num_bins_; i++) {
+    float count = histogram_[i];
+    if (cum + count >= target) {
+      float frac = (target - cum) / (count > 0.0f ? count : 1.0f);
+      return (i + frac) * bin_width;
+    }
+    cum += count;
+  }
+  return (num_bins_ - 1) * bin_width;
+}
+
+const char *HpUkfComponent::state_to_string(HpState s) {
+  switch (s) {
+    case HpState::OFF: return "off";
+    case HpState::FAN_ONLY: return "fan_only";
+    case HpState::HEATING_IDLE: return "heating_idle";
+    case HpState::HEATING_RAMP_UP: return "heating_ramp_up";
+    case HpState::HEATING_ACTIVE: return "heating_active";
+    case HpState::DEFROSTING: return "defrosting";
+    case HpState::DEFROST_END: return "defrost_end";
+    case HpState::DEFROST_RAMP_UP: return "defrost_ramp_up";
+    case HpState::COOLING_IDLE: return "cooling_idle";
+    case HpState::COOLING_RAMP_UP: return "cooling_ramp_up";
+    case HpState::COOLING_ACTIVE: return "cooling_active";
+    case HpState::STABILIZING: return "stabilizing";
+    default: return "unknown";
+  }
+}
+
+HpState HpUkfComponent::evaluate_state_machine(uint8_t action, float power_w, float compressor_hz,
+                                               float t_in, float t_out, float power_low,
+                                               float power_high, float power_high_ramp) {
+  bool power_ok = std::isfinite(power_w) && power_w >= 0.0f;
+  bool temps_ok = std::isfinite(t_in) && std::isfinite(t_out);
+  float delta_t = temps_ok ? (t_out - t_in) : 0.0f;
+  float low_threshold = std::isfinite(power_low) && power_low >= 0.0f
+      ? power_low : POWER_FALLBACK_LOW_W;
+  float high_threshold = std::isfinite(power_high) && power_high >= 0.0f
+      ? power_high : POWER_FALLBACK_HIGH_W;
+  float ramp_high_threshold = std::isfinite(power_high_ramp) && power_high_ramp >= 0.0f
+      ? power_high_ramp : POWER_FALLBACK_HIGH_W;
+  bool power_above_high = power_ok && power_w >= high_threshold;
+  bool power_above_ramp = power_ok && power_w >= ramp_high_threshold;
+  bool power_below_low = power_ok && power_w < low_threshold;
+  bool compressor_high = std::isfinite(compressor_hz) && compressor_hz > compressor_low_hz_;
+  bool compressor_low = !std::isfinite(compressor_hz) || compressor_hz <= compressor_low_hz_;
+  uint32_t now = millis();
+
+  if (action == 0) {
+    defrost_dip_seen_ = false;
+    defrost_recovery_seen_ = false;
+    was_above_high_ = false;
+    was_below_low_ = false;
+    return HpState::OFF;
+  }
+  if (action == 6) {
+    defrost_dip_seen_ = false;
+    defrost_recovery_seen_ = false;
+    was_above_high_ = false;
+    was_below_low_ = false;
+    return HpState::FAN_ONLY;
+  }
+
+  if (action == 3) {
+    bool outlet_below_inlet = temps_ok && (t_out < t_in);
+    if (state_ == HpState::DEFROSTING) {
+      if (now - defrost_start_ms_ > DEFROST_MAX_DURATION_MS) {
+        defrost_dip_seen_ = false;
+        defrost_recovery_seen_ = false;
+        return HpState::DEFROST_RAMP_UP;
+      }
+      if (was_above_high_ && power_below_low && (now - defrost_start_ms_ <= DEFROST_END_WINDOW_MS)) {
+        defrost_dip_seen_ = false;
+        defrost_recovery_seen_ = false;
+        return HpState::DEFROST_END;
+      }
+      was_above_high_ = power_above_high;
+      was_below_low_ = power_below_low;
+      if (power_above_high)
+        last_above_high_ms_ = now;
+      if (power_below_low)
+        last_below_low_ms_ = now;
+      return HpState::DEFROSTING;
+    }
+    if (state_ == HpState::DEFROST_END) {
+      if (power_ok && compressor_high) {
+        was_above_high_ = power_above_high;
+        was_below_low_ = power_below_low;
+        return HpState::DEFROST_RAMP_UP;
+      }
+      return HpState::DEFROST_END;
+    }
+    if (state_ == HpState::DEFROST_RAMP_UP) {
+      if (temps_ok && t_out > t_in && delta_t >= HEATING_ACTIVE_DELTA_T_STRONG &&
+          (power_ok && power_w > HEATING_IDLE_MAX_POWER_W || compressor_high))
+        return HpState::HEATING_ACTIVE;
+      if ((now - ramp_up_start_ms_) > RAMP_UP_MAX_MS)
+        return HpState::HEATING_ACTIVE;
+      if (temps_ok && t_out > t_in && delta_t >= delta_t_margin_)
+        return HpState::HEATING_ACTIVE;
+      if (temps_ok && t_out > t_in)
+        return HpState::HEATING_RAMP_UP;
+      was_above_high_ = power_above_high;
+      was_below_low_ = power_below_low;
+      return HpState::DEFROST_RAMP_UP;
+    }
+    // Only force idle from compressor when we have a valid reading that is low.
+    // When compressor is unknown (NaN), let power and delta_T determine state.
+    if (std::isfinite(compressor_hz) && compressor_hz <= ACTIVE_MIN_COMPRESSOR_HZ) {
+      defrost_dip_seen_ = false;
+      defrost_recovery_seen_ = false;
+      was_above_high_ = false;
+      was_below_low_ = true;
+      return HpState::HEATING_IDLE;
+    }
+    if (!defrost_dip_seen_) {
+      if (power_above_high)
+        was_above_high_ = true;
+      if (was_above_high_ && power_below_low && compressor_low) {
+        defrost_dip_seen_ = true;
+        last_below_low_ms_ = now;
+      }
+    } else if (!defrost_recovery_seen_) {
+      if (now - last_below_low_ms_ > DEFROST_RECOVERY_MS) {
+        defrost_dip_seen_ = false;
+      } else if (power_ok && power_w >= low_threshold && compressor_high && outlet_below_inlet) {
+        defrost_recovery_seen_ = true;
+        defrost_start_ms_ = now;
+        was_above_high_ = power_above_high;
+        was_below_low_ = power_below_low;
+        return HpState::DEFROSTING;
+      }
+    }
+    if (power_below_low && compressor_low &&
+        (!power_ok || power_w <= HEATING_IDLE_MAX_POWER_W) &&
+        (!power_ok || power_w <= ACTIVE_MIN_POWER_W) &&
+        (!std::isfinite(compressor_hz) || compressor_hz <= ACTIVE_MIN_COMPRESSOR_HZ)) {
+      defrost_dip_seen_ = false;
+      defrost_recovery_seen_ = false;
+      was_above_high_ = false;
+      was_below_low_ = true;
+      return HpState::HEATING_IDLE;
+    }
+    if (state_ == HpState::HEATING_ACTIVE &&
+        (!power_ok || power_w < ACTIVE_MIN_POWER_W) &&
+        (!std::isfinite(compressor_hz) || compressor_hz <= ACTIVE_MIN_COMPRESSOR_HZ))
+      return HpState::HEATING_IDLE;
+    if (temps_ok && t_out > t_in && delta_t >= HEATING_ACTIVE_DELTA_T_STRONG &&
+        (power_ok && power_w > HEATING_IDLE_MAX_POWER_W || compressor_high))
+      return HpState::HEATING_ACTIVE;
+    // When compressor is unknown, power and delta_T alone can indicate active.
+    if (!std::isfinite(compressor_hz) && power_ok && power_w >= ACTIVE_MIN_POWER_W &&
+        temps_ok && t_out > t_in && delta_t >= HEATING_ACTIVE_DELTA_T_STRONG)
+      return HpState::HEATING_ACTIVE;
+    if (state_ == HpState::HEATING_RAMP_UP && (now - ramp_up_start_ms_) > RAMP_UP_MAX_MS)
+      return HpState::HEATING_ACTIVE;
+    if (power_above_ramp && compressor_high && temps_ok && delta_t >= delta_t_margin_ && t_out > t_in)
+      return HpState::HEATING_ACTIVE;
+    if (power_ok && compressor_high && temps_ok && delta_t < delta_t_margin_ && t_out <= t_in + delta_t_margin_) {
+      if (state_ == HpState::HEATING_ACTIVE)
+        return HpState::HEATING_ACTIVE;
+      return HpState::HEATING_RAMP_UP;
+    }
+    if (power_above_ramp && compressor_high)
+      return HpState::HEATING_ACTIVE;
+    if (power_below_low && compressor_low &&
+        (!power_ok || power_w <= HEATING_IDLE_MAX_POWER_W) &&
+        (!power_ok || power_w <= ACTIVE_MIN_POWER_W) &&
+        (!std::isfinite(compressor_hz) || compressor_hz <= ACTIVE_MIN_COMPRESSOR_HZ))
+      return HpState::HEATING_IDLE;
+    if (state_ == HpState::HEATING_ACTIVE)
+      return HpState::HEATING_ACTIVE;
+    return HpState::HEATING_RAMP_UP;
+  }
+
+  if (action == 2 || action == 5) {
+    defrost_dip_seen_ = false;
+    defrost_recovery_seen_ = false;
+    was_above_high_ = false;
+    was_below_low_ = false;
+    if (!std::isfinite(compressor_hz) || compressor_hz <= ACTIVE_MIN_COMPRESSOR_HZ)
+      return HpState::COOLING_IDLE;
+    if (power_below_low && compressor_low &&
+        (!power_ok || power_w <= ACTIVE_MIN_POWER_W) &&
+        (!std::isfinite(compressor_hz) || compressor_hz <= ACTIVE_MIN_COMPRESSOR_HZ))
+      return HpState::COOLING_IDLE;
+    if (state_ == HpState::COOLING_ACTIVE &&
+        (!power_ok || power_w < ACTIVE_MIN_POWER_W) &&
+        (!std::isfinite(compressor_hz) || compressor_hz <= ACTIVE_MIN_COMPRESSOR_HZ))
+      return HpState::COOLING_IDLE;
+    if (state_ == HpState::COOLING_RAMP_UP && (now - ramp_up_start_ms_) > RAMP_UP_MAX_MS)
+      return HpState::COOLING_ACTIVE;
+    if (power_above_ramp && compressor_high && temps_ok && delta_t <= -delta_t_margin_)
+      return HpState::COOLING_ACTIVE;
+    if (power_ok && compressor_high && temps_ok && delta_t > -delta_t_margin_) {
+      if (state_ == HpState::COOLING_ACTIVE)
+        return HpState::COOLING_ACTIVE;
+      return HpState::COOLING_RAMP_UP;
+    }
+    if (power_below_low && compressor_low &&
+        (!power_ok || power_w <= ACTIVE_MIN_POWER_W) &&
+        (!std::isfinite(compressor_hz) || compressor_hz <= ACTIVE_MIN_COMPRESSOR_HZ))
+      return HpState::COOLING_IDLE;
+    if (state_ == HpState::COOLING_ACTIVE)
+      return HpState::COOLING_ACTIVE;
+    return HpState::COOLING_RAMP_UP;
+  }
+
+  defrost_dip_seen_ = false;
+  defrost_recovery_seen_ = false;
+  was_above_high_ = false;
+  was_below_low_ = false;
+  return HpState::UNKNOWN;
+}
+
+void HpUkfComponent::setup() {
+  uint32_t t_setup_start_us = micros();
+  ESP_LOGCONFIG(TAG, "Setting up HP-UKF component");
+  for (int i = 0; i < HP_STATE_HISTOGRAM_MAX_BINS; i++)
+    histogram_[i] = 0.0f;
+  last_histogram_update_ms_ = millis();
+  state_ = HpState::UNKNOWN;
+  if (air_flow_ != nullptr) {
+    filter_.set_state_dimension(virtual_coil_ ? (track_derivatives_ ? 11 : 7) : (track_derivatives_ ? 10 : 6));
+    filter_.set_atmospheric_pressure(pressure_pa_);
+    filter_.set_delivered_power_lag_tau_s(delivered_power_lag_tau_s_);
+    if (virtual_coil_) {
+      filter_.set_coil_tau_s(coil_tau_s_);
+      filter_.set_outlet_air_tau_s(outlet_air_tau_s_);
+    }
+>>>>>>> inferred-states
   } else {
     filter_.set_state_dimension(track_derivatives_ ? 8 : 4);
   }
@@ -156,6 +426,20 @@ void HpUkfComponent::setup() {
     float p_kw = delivered_power_kw(x0[0], x0[1], x0[2], x0[3], x0[4], pressure_pa_);
     x0[5] = std::isfinite(p_kw) ? p_kw : 0.0f;
   }
+<<<<<<< HEAD
+=======
+  if (n >= 7) {
+    int tvcoil_idx = n - 1;
+    float T_coil_after = read_sensor(outside_coil_temperature_after_);
+    float T_outside = read_sensor(outside_temperature_);
+    if (std::isfinite(T_coil_after))
+      x0[tvcoil_idx] = T_coil_after;
+    else if (std::isfinite(T_outside))
+      x0[tvcoil_idx] = T_outside;
+    else
+      x0[tvcoil_idx] = x0[2];
+  }
+>>>>>>> inferred-states
 
   float P0[HpUkfFilter::N_MAX * HpUkfFilter::N_MAX];
   for (int i = 0; i < n * n; i++)
@@ -170,6 +454,7 @@ void HpUkfComponent::setup() {
     filter_.set_em_lambda_r_inlet(em_lambda_r_inlet_);
     filter_.set_em_lambda_r_outlet(em_lambda_r_outlet_);
     filter_.set_em_inflation(em_inflation_);
+    filter_.set_em_warmup_steps(em_warmup_steps_);
   }
 
   // Publish initial state so sensors show values immediately (avoids NaN/unknown
@@ -187,8 +472,17 @@ void HpUkfComponent::setup() {
     if (filtered_air_flow_ && std::isfinite(x[4]))
       filtered_air_flow_->publish_state(x[4]);
     if (delivered_power_ && std::isfinite(x[5]))
+<<<<<<< HEAD
       delivered_power_->publish_state(x[5]);
   }
+=======
+      delivered_power_->publish_state(x[5] * 1000.0f);  // kW -> W
+    if (delivered_power_lag_ && std::isfinite(x[5]))
+      delivered_power_lag_->publish_state(x[5] * 1000.0f);  // kW -> W
+  }
+  if (n >= 7 && filtered_virtual_coil_temperature_ && std::isfinite(x[n - 1]))
+    filtered_virtual_coil_temperature_->publish_state(x[n - 1]);
+>>>>>>> inferred-states
   if (track_derivatives_ && n >= 8) {
     int d0 = (n >= 10) ? 6 : 4;
     if (filtered_inlet_temperature_derivative_)
@@ -225,6 +519,8 @@ void HpUkfComponent::setup() {
       ESP_LOGD(TAG, "  q_dt_in: %.6e  q_dt_out: %.6e  q_drh_in: %.6e  q_drh_out: %.6e",
                q_diag[4], q_diag[5], q_diag[6], q_diag[7]);
     }
+    if (n >= 7)
+      ESP_LOGD(TAG, "  q_tvcoil: %.6e", q_diag[n - 1]);
     ESP_LOGD(TAG, "  r_t_in: %.6e  r_rh_in: %.6e  r_t_out: %.6e  r_rh_out: %.6e",
              r_diag[0], r_diag[1], r_diag[2], r_diag[3]);
     if (em_q_t_in_) em_q_t_in_->publish_state(q_diag[0]);
@@ -275,14 +571,23 @@ void HpUkfComponent::update() {
   dt_s = std::max(1e-6f, std::min(dt_s, 3600.0f));
 
   uint8_t action = 0;
+<<<<<<< HEAD
   float compressor_hz = 0.0f;
+=======
+  float compressor_hz = NAN;  // unknown until we have a valid reading
+>>>>>>> inferred-states
   float power_kw = NAN;
   if (climate_ != nullptr) {
     action = static_cast<uint8_t>(climate_->action);
   }
   if (compressor_frequency_ != nullptr && compressor_frequency_->has_state()) {
     float v = compressor_frequency_->get_state();
+<<<<<<< HEAD
     compressor_hz = std::isfinite(v) ? v : 0.0f;
+=======
+    if (std::isfinite(v) && v >= 0.0f)
+      compressor_hz = v;
+>>>>>>> inferred-states
   }
   if (power_sensor_ != nullptr && power_sensor_->has_state()) {
     float w = power_sensor_->get_state();
@@ -295,8 +600,46 @@ void HpUkfComponent::update() {
   float T_coil_after = read_sensor(outside_coil_temperature_after_);
   float T_room = read_sensor(inside_room_temperature_);
   float rh_room = read_sensor(inside_room_humidity_);
+<<<<<<< HEAD
   filter_.set_control_input(action, compressor_hz, power_kw, T_outside, T_coil_before, T_coil_after,
                             T_room, rh_room);
+=======
+  if (std::isfinite(T_room) || std::isfinite(rh_room)) {
+    ESP_LOGD(TAG, "Indoor T_room=%.2f °C rh_room=%.1f %%", T_room, rh_room);
+  }
+
+  float power_w = NAN;
+  if (power_sensor_ != nullptr && power_sensor_->has_state()) {
+    float w = power_sensor_->get_state();
+    if (std::isfinite(w) && w >= 0.0f)
+      power_w = w;
+  }
+  float t_in = read_sensor(inlet_temperature_);
+  float t_out = read_sensor(outlet_temperature_);
+  bool in_defrost = (state_ == HpState::DEFROSTING || state_ == HpState::DEFROST_END ||
+                    state_ == HpState::DEFROST_RAMP_UP);
+  update_histogram(power_w, action, in_defrost, t_in, t_out);
+  float power_low = percentile(0.25f);
+  float power_high = percentile(0.75f);
+  float power_high_ramp = percentile(0.5f);
+  HpState new_state = evaluate_state_machine(action, power_w, compressor_hz, t_in, t_out,
+                                             power_low, power_high, power_high_ramp);
+  if ((new_state == HpState::HEATING_RAMP_UP || new_state == HpState::COOLING_RAMP_UP ||
+       new_state == HpState::DEFROST_RAMP_UP) &&
+      state_ != new_state) {
+    ramp_up_start_ms_ = millis();
+  }
+  state_ = new_state;
+  if (state_text_sensor_ != nullptr)
+    state_text_sensor_->publish_state(state_to_string(state_));
+  if (defrosting_binary_sensor_ != nullptr)
+    defrosting_binary_sensor_->publish_state(state_ == HpState::DEFROSTING);
+
+  // Pass inferred state to UKF; use 255 (ignore) when state machine not run (no climate).
+  uint8_t hp_state_ukf = (climate_ != nullptr) ? static_cast<uint8_t>(new_state) : 255;
+  filter_.set_control_input(action, hp_state_ukf, compressor_hz, power_kw, T_outside, T_coil_before,
+                            T_coil_after, T_room, rh_room);
+>>>>>>> inferred-states
 
   filter_.predict(dt_s);
   uint32_t t_after_predict_us = micros();
@@ -343,8 +686,17 @@ void HpUkfComponent::update() {
     if (filtered_air_flow_ && std::isfinite(x[4]))
       filtered_air_flow_->publish_state(x[4]);
     if (delivered_power_ && std::isfinite(x[5]))
+<<<<<<< HEAD
       delivered_power_->publish_state(x[5]);
   }
+=======
+      delivered_power_->publish_state(x[5] * 1000.0f);  // kW -> W
+    if (delivered_power_lag_ && std::isfinite(x[5]))
+      delivered_power_lag_->publish_state(x[5] * 1000.0f);  // kW -> W
+  }
+  if (n >= 7 && filtered_virtual_coil_temperature_ && std::isfinite(x[n - 1]))
+    filtered_virtual_coil_temperature_->publish_state(x[n - 1]);
+>>>>>>> inferred-states
   if (track_derivatives_ && n >= 8) {
     int d0 = (n >= 10) ? 6 : 4;
     if (filtered_inlet_temperature_derivative_ && std::isfinite(x[d0 + 0]))
@@ -380,6 +732,8 @@ void HpUkfComponent::update() {
       ESP_LOGD(TAG, "  q_dt_in: %.6e  q_dt_out: %.6e  q_drh_in: %.6e  q_drh_out: %.6e",
                q_diag[4], q_diag[5], q_diag[6], q_diag[7]);
     }
+    if (n >= 7)
+      ESP_LOGD(TAG, "  q_tvcoil: %.6e", q_diag[n - 1]);
     ESP_LOGD(TAG, "  r_t_in: %.6e  r_rh_in: %.6e  r_t_out: %.6e  r_rh_out: %.6e",
              r_diag[0], r_diag[1], r_diag[2], r_diag[3]);
     if (em_q_t_in_ && std::isfinite(q_diag[0])) em_q_t_in_->publish_state(q_diag[0]);
@@ -429,14 +783,23 @@ void HpUkfComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "  Climate (action input): %s", climate_ ? "set" : "not set");
   ESP_LOGCONFIG(TAG, "  Compressor frequency sensor (Hz): %s", compressor_frequency_ ? "set" : "not set");
   ESP_LOGCONFIG(TAG, "  Power sensor (W, control input): %s", power_sensor_ ? "set" : "not set");
+<<<<<<< HEAD
+=======
+  ESP_LOGCONFIG(TAG, "  Inside room temperature: %s", inside_room_temperature_ ? "set" : "not set");
+  ESP_LOGCONFIG(TAG, "  Inside room humidity: %s", inside_room_humidity_ ? "set" : "not set");
+>>>>>>> inferred-states
   ESP_LOGCONFIG(TAG, "  Atmospheric pressure: %.2f hPa", pressure_pa_ / 100.0f);
   ESP_LOGCONFIG(TAG, "  EM auto-tune: %s", em_autotune_ ? "enabled" : "disabled");
   if (em_autotune_) {
-    ESP_LOGCONFIG(TAG, "  EM lambda_q=%.3f, lambda_r_inlet=%.3f, lambda_r_outlet=%.3f, inflation=%.2f",
-                  em_lambda_q_, em_lambda_r_inlet_, em_lambda_r_outlet_, em_inflation_);
+    ESP_LOGCONFIG(TAG, "  EM lambda_q=%.3f, lambda_r_inlet=%.3f, lambda_r_outlet=%.3f, inflation=%.2f, warmup_steps=%u",
+                  em_lambda_q_, em_lambda_r_inlet_, em_lambda_r_outlet_, em_inflation_, (unsigned) em_warmup_steps_);
     int em_sensors = (em_q_t_in_ ? 1 : 0) + (em_q_rh_in_ ? 1 : 0) + (em_q_t_out_ ? 1 : 0) + (em_q_rh_out_ ? 1 : 0)
         + (em_r_t_in_ ? 1 : 0) + (em_r_rh_in_ ? 1 : 0) + (em_r_t_out_ ? 1 : 0) + (em_r_rh_out_ ? 1 : 0);
     ESP_LOGCONFIG(TAG, "  EM Q/R sensors configured: %d", em_sensors);
+  }
+  if (state_text_sensor_ != nullptr || defrosting_binary_sensor_ != nullptr) {
+    ESP_LOGCONFIG(TAG, "  State machine: %d bins, power_max %d W, half_life %d s, delta_t_margin %.2f",
+                  num_bins_, power_max_w_, histogram_half_life_sec_, delta_t_margin_);
   }
 }
 

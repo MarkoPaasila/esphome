@@ -3,6 +3,10 @@
 # ============================================================================
 # ESPHome Build and Runtime Files
 # ============================================================================
+# test configs
+mitsurunner-test.yaml
+hp-ukf-test.yaml
+z-basics.yaml
 
 # Build directory - contains compiled firmware and intermediate files
 .esphome/

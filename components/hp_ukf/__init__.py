@@ -11,9 +11,15 @@ from esphome.const import (
     UNIT_CELSIUS,
     UNIT_PERCENT,
 )
+<<<<<<< HEAD
 from esphome.components import climate, sensor
 
 DEPENDENCIES = ["sensor", "climate"]
+=======
+from esphome.components import climate, sensor, text_sensor, binary_sensor
+
+DEPENDENCIES = ["sensor", "climate", "text_sensor", "binary_sensor"]
+>>>>>>> inferred-states
 
 hp_ukf_ns = cg.esphome_ns.namespace("hp_ukf")
 HpUkfComponent = hp_ukf_ns.class_("HpUkfComponent", cg.PollingComponent)
@@ -38,6 +44,7 @@ CONF_EM_LAMBDA_Q = "em_lambda_q"
 CONF_EM_LAMBDA_R_INLET = "em_lambda_r_inlet"
 CONF_EM_LAMBDA_R_OUTLET = "em_lambda_r_outlet"
 CONF_EM_INFLATION = "em_inflation"
+CONF_EM_WARMUP_STEPS = "em_warmup_steps"
 CONF_EM_Q_T_IN = "em_q_t_in"
 CONF_EM_Q_RH_IN = "em_q_rh_in"
 CONF_EM_Q_T_OUT = "em_q_t_out"
@@ -65,6 +72,15 @@ CONF_OUTLET_HUMIDITY_RATIO = "outlet_humidity_ratio"
 CONF_AIR_FLOW = "air_flow"
 CONF_FILTERED_AIR_FLOW = "filtered_air_flow"
 CONF_DELIVERED_POWER = "delivered_power"
+<<<<<<< HEAD
+=======
+CONF_DELIVERED_POWER_LAG = "delivered_power_lag"
+CONF_DELIVERED_POWER_LAG_TAU_S = "delivered_power_lag_tau_s"
+CONF_VIRTUAL_COIL = "virtual_coil"
+CONF_COIL_TAU_S = "coil_tau_s"
+CONF_OUTLET_AIR_TAU_S = "outlet_air_tau_s"
+CONF_FILTERED_VIRTUAL_COIL_TEMPERATURE = "filtered_virtual_coil_temperature"
+>>>>>>> inferred-states
 CONF_CLIMATE = "climate"
 CONF_COMPRESSOR_FREQUENCY = "compressor_frequency"
 CONF_POWER_SENSOR = "power_sensor"
@@ -73,6 +89,16 @@ CONF_OUTSIDE_COIL_TEMPERATURE_BEFORE = "outside_coil_temperature_before"
 CONF_OUTSIDE_COIL_TEMPERATURE_AFTER = "outside_coil_temperature_after"
 CONF_INSIDE_ROOM_TEMPERATURE = "inside_room_temperature"
 CONF_INSIDE_ROOM_HUMIDITY = "inside_room_humidity"
+<<<<<<< HEAD
+=======
+CONF_STATE = "state"
+CONF_DEFROSTING = "defrosting"
+CONF_HISTOGRAM_HALF_LIFE_SEC = "histogram_half_life_sec"
+CONF_POWER_MAX_W = "power_max_w"
+CONF_NUM_BINS = "num_bins"
+CONF_DELTA_T_MARGIN = "delta_t_margin"
+CONF_COMPRESSOR_LOW_HZ = "compressor_low_hz"
+>>>>>>> inferred-states
 
 
 def _em_lambda(value):
@@ -169,6 +195,7 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_EM_LAMBDA_R_INLET, default=0.998): _em_lambda,
         cv.Optional(CONF_EM_LAMBDA_R_OUTLET, default=0.98): _em_lambda,
         cv.Optional(CONF_EM_INFLATION, default=0.5): cv.float_range(min=0.0, max=2.0),
+        cv.Optional(CONF_EM_WARMUP_STEPS, default=20): cv.int_range(min=0, max=1000),
         cv.Optional(CONF_EM_Q_T_IN): sensor.sensor_schema(
             unit_of_measurement="°C²",
             accuracy_decimals=6,
@@ -294,8 +321,31 @@ CONFIG_SCHEMA = cv.Schema(
             state_class=STATE_CLASS_MEASUREMENT,
         ),
         cv.Optional(CONF_DELIVERED_POWER): sensor.sensor_schema(
+<<<<<<< HEAD
             unit_of_measurement="kW",
             accuracy_decimals=3,
+=======
+            unit_of_measurement="W",
+            accuracy_decimals=1,
+            state_class=STATE_CLASS_MEASUREMENT,
+        ),
+        cv.Optional(CONF_DELIVERED_POWER_LAG): sensor.sensor_schema(
+            unit_of_measurement="W",
+            accuracy_decimals=1,
+            state_class=STATE_CLASS_MEASUREMENT,
+        ),
+        cv.Optional(CONF_DELIVERED_POWER_LAG_TAU_S, default=30.0): cv.float_range(min=0.0),
+        cv.Optional(CONF_VIRTUAL_COIL, default=False): cv.boolean,
+        cv.Optional(CONF_COIL_TAU_S, default=60.0): cv.float_range(min=0.1),
+        cv.Optional(CONF_OUTLET_AIR_TAU_S, default=20.0): cv.float_range(min=0.1),
+        cv.Optional(
+            CONF_FILTERED_VIRTUAL_COIL_TEMPERATURE,
+            default={CONF_NAME: "Filtered Virtual Coil Temperature"},
+        ): sensor.sensor_schema(
+            unit_of_measurement=UNIT_CELSIUS,
+            accuracy_decimals=2,
+            device_class=DEVICE_CLASS_TEMPERATURE,
+>>>>>>> inferred-states
             state_class=STATE_CLASS_MEASUREMENT,
         ),
         cv.Optional(CONF_CLIMATE): cv.use_id(climate.Climate),
@@ -306,13 +356,35 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_OUTSIDE_COIL_TEMPERATURE_AFTER): cv.use_id(sensor.Sensor),
         cv.Optional(CONF_INSIDE_ROOM_TEMPERATURE): cv.use_id(sensor.Sensor),
         cv.Optional(CONF_INSIDE_ROOM_HUMIDITY): cv.use_id(sensor.Sensor),
+<<<<<<< HEAD
+=======
+        cv.Optional(CONF_STATE): text_sensor.text_sensor_schema(),
+        cv.Optional(CONF_DEFROSTING): binary_sensor.binary_sensor_schema(device_class="cold"),
+        cv.Optional(CONF_HISTOGRAM_HALF_LIFE_SEC, default=600): cv.positive_int,
+        cv.Optional(CONF_POWER_MAX_W, default=3500): cv.positive_int,
+        cv.Optional(CONF_NUM_BINS, default=35): cv.int_range(min=5, max=100),
+        cv.Optional(CONF_DELTA_T_MARGIN, default=1.0): cv.float_range(min=0.0, max=10.0),
+        cv.Optional(CONF_COMPRESSOR_LOW_HZ, default=5.0): cv.float_range(min=0.0, max=100.0),
+>>>>>>> inferred-states
     }
 ).extend(cv.COMPONENT_SCHEMA)
 
 
 def _validate_air_flow_deps(config):
+<<<<<<< HEAD
     if (CONF_FILTERED_AIR_FLOW in config or CONF_DELIVERED_POWER in config) and CONF_AIR_FLOW not in config:
         raise cv.Invalid("filtered_air_flow and delivered_power require air_flow to be set")
+=======
+    need_air_flow = (
+        CONF_FILTERED_AIR_FLOW in config
+        or CONF_DELIVERED_POWER in config
+        or CONF_DELIVERED_POWER_LAG in config
+    )
+    if need_air_flow and CONF_AIR_FLOW not in config:
+        raise cv.Invalid(
+            "filtered_air_flow, delivered_power and delivered_power_lag require air_flow to be set"
+        )
+>>>>>>> inferred-states
     return config
 
 
@@ -339,6 +411,14 @@ async def to_code(config):
     if CONF_AIR_FLOW in config:
         sens = await cg.get_variable(config[CONF_AIR_FLOW])
         cg.add(var.set_air_flow_sensor(sens))
+<<<<<<< HEAD
+=======
+        cg.add(var.set_delivered_power_lag_tau_s(config[CONF_DELIVERED_POWER_LAG_TAU_S]))
+        if config.get(CONF_VIRTUAL_COIL, False):
+            cg.add(var.set_virtual_coil(True))
+            cg.add(var.set_coil_tau_s(config[CONF_COIL_TAU_S]))
+            cg.add(var.set_outlet_air_tau_s(config[CONF_OUTLET_AIR_TAU_S]))
+>>>>>>> inferred-states
     if CONF_CLIMATE in config:
         clim = await cg.get_variable(config[CONF_CLIMATE])
         cg.add(var.set_climate(clim))
@@ -363,12 +443,30 @@ async def to_code(config):
     if CONF_INSIDE_ROOM_HUMIDITY in config:
         sens = await cg.get_variable(config[CONF_INSIDE_ROOM_HUMIDITY])
         cg.add(var.set_inside_room_humidity_sensor(sens))
+<<<<<<< HEAD
+=======
+    if CONF_STATE in config:
+        state_ts = await text_sensor.new_text_sensor(config[CONF_STATE])
+        cg.add(var.set_state_text_sensor(state_ts))
+    if CONF_DEFROSTING in config:
+        defrost_bs = await binary_sensor.new_binary_sensor(config[CONF_DEFROSTING])
+        cg.add(var.set_defrosting_binary_sensor(defrost_bs))
+    cg.add(var.set_histogram_half_life_sec(config[CONF_HISTOGRAM_HALF_LIFE_SEC]))
+    cg.add(var.set_power_max_w(config[CONF_POWER_MAX_W]))
+    cg.add(var.set_num_bins(config[CONF_NUM_BINS]))
+    cg.add(var.set_delta_t_margin(config[CONF_DELTA_T_MARGIN]))
+    cg.add(var.set_compressor_low_hz(config[CONF_COMPRESSOR_LOW_HZ]))
+>>>>>>> inferred-states
 
     cg.add(var.set_em_autotune(config[CONF_EM_AUTOTUNE]))
     cg.add(var.set_em_lambda_q(config[CONF_EM_LAMBDA_Q]))
     cg.add(var.set_em_lambda_r_inlet(config[CONF_EM_LAMBDA_R_INLET]))
     cg.add(var.set_em_lambda_r_outlet(config[CONF_EM_LAMBDA_R_OUTLET]))
     cg.add(var.set_em_inflation(config[CONF_EM_INFLATION]))
+<<<<<<< HEAD
+=======
+    cg.add(var.set_em_warmup_steps(config[CONF_EM_WARMUP_STEPS]))
+>>>>>>> inferred-states
     cg.add(var.set_atmospheric_pressure(config[CONF_ATMOSPHERIC_PRESSURE] * 100.0))
 
     sens = await sensor.new_sensor(config[CONF_FILTERED_INLET_TEMPERATURE])
@@ -387,6 +485,8 @@ async def to_code(config):
     cg.add(var.set_filtered_inlet_humidity_derivative_sensor(sens))
     sens = await sensor.new_sensor(config[CONF_FILTERED_OUTLET_HUMIDITY_DERIVATIVE])
     cg.add(var.set_filtered_outlet_humidity_derivative_sensor(sens))
+    sens = await sensor.new_sensor(config[CONF_FILTERED_VIRTUAL_COIL_TEMPERATURE])
+    cg.add(var.set_filtered_virtual_coil_temperature_sensor(sens))
 
     if CONF_EM_Q_T_IN in config:
         sens = await sensor.new_sensor(config[CONF_EM_Q_T_IN])
@@ -463,3 +563,9 @@ async def to_code(config):
     if CONF_DELIVERED_POWER in config:
         sens = await sensor.new_sensor(config[CONF_DELIVERED_POWER])
         cg.add(var.set_delivered_power_sensor(sens))
+<<<<<<< HEAD
+=======
+    if CONF_DELIVERED_POWER_LAG in config:
+        sens = await sensor.new_sensor(config[CONF_DELIVERED_POWER_LAG])
+        cg.add(var.set_delivered_power_lag_sensor(sens))
+>>>>>>> inferred-states
