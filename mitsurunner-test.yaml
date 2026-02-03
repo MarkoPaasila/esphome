@@ -19,6 +19,13 @@ climate:
       temperature_step: 1.0
     compressor_frequency_sensor:
       name: "Compressor frequency"
+      filters:
+        - lambda: |-
+            if (x <= 4.1) {          // use <= 4.1 to catch minor float noise around 4
+              return 0.0;
+            } else {
+              return x;
+            }
     vertical_vane_select:
       name: "Vertical Vane Orientation"
     horizontal_vane_select:
@@ -27,7 +34,7 @@ climate:
 mitsurunner:
   heat_exchanger_temperature_sensor_id: heat_exchanger_temp
   outdoor_temperature_sensor_id: outdoor_temp
-  defrost_relay_id: defrost_relay
+  defrost_relay_id: allow_defrost_relay
   # Optional: update_interval (default 60s = state machine runs once per minute)
   # update_interval: 60s
   # Optional: all thresholds and times below (defaults match constants.h)
@@ -40,17 +47,17 @@ mitsurunner:
   # temperature_delta_decreasing_excess_time_min: 5
   # max_heating_time_min: 180
   # min_heating_time_min: 50
-  # relay_off_time_min: 30
+  # defrost_duration_min: 30
   # defrost_timeout_min: 10
   # reset_sensor_delay_sec: 25
   # initialize_delay_sec: 60
-  defrost_prevented_sensor:
-    name: "Defrost Prevented"
+  defrost_allowed_sensor:
+    name: "Defrost Allowed"
   # Delta = heat exchanger − outdoor; negative when coil is colder than outside.
   temperature_delta_sensor:
     name: "Outdoor Coil Temperature Delta"
-  defrost_inhibit_switch:
-    name: "Defrost inhibiting"
+  smart_defrost_logic:
+    name: "Smart Defrost Logic"
 
 sensor:
 # ----------------- PZEM ------------------ #
@@ -158,9 +165,9 @@ switch:
   - platform: gpio
     pin:
       number: 23
-      inverted: false
+      inverted: true
     name: "Allow Defrost Relay"
-    id: defrost_relay
+    id: allow_defrost_relay
     on_turn_on:
       then:
         - switch.turn_off: heater_relay

@@ -39,7 +39,7 @@ namespace mitsurunner {
 
 class MitsurunnerComponent;
 
-class MitsurunnerDefrostInhibitSwitch : public switch_::Switch {
+class MitsurunnerDefrostAllowedSwitch : public switch_::Switch {
  public:
   void set_component(MitsurunnerComponent *component) { component_ = component; }
 
@@ -78,18 +78,18 @@ class MitsurunnerComponent : public PollingComponent {
  public:
   void set_heat_exchanger_sensor(sensor::Sensor *s) { heat_exchanger_sensor_ = s; }
   void set_outdoor_sensor(sensor::Sensor *s) { outdoor_sensor_ = s; }
-  void set_defrost_relay(switch_::Switch *s) { defrost_relay_ = s; }
+  void set_allow_defrost_relay(switch_::Switch *s) { allow_defrost_relay_ = s; }
   void set_expose_state_text_sensor(bool b) { expose_state_text_sensor_ = b; }
-  void set_defrost_prevented_sensor(binary_sensor::BinarySensor *s) {
-    defrost_prevented_sensor_ = s;
+  void set_defrost_allowed_sensor(binary_sensor::BinarySensor *s) {
+    defrost_allowed_sensor_ = s;
   }
   void set_temperature_delta_sensor(sensor::Sensor *s) { temperature_delta_sensor_ = s; }
-  void set_defrost_inhibit_switch(MitsurunnerDefrostInhibitSwitch *s) {
-    defrost_inhibit_switch_ = s;
+  void set_defrost_allowed_switch(MitsurunnerDefrostAllowedSwitch *s) {
+    defrost_allowed_switch_ = s;
   }
   void set_expose_manual_defrost_switch(bool b) { expose_manual_defrost_switch_ = b; }
 
-  void set_defrost_inhibit_enabled(bool enabled);
+  void set_defrost_allowed_enabled(bool allowed);
 
   void request_manual_defrost();
 
@@ -102,7 +102,7 @@ class MitsurunnerComponent : public PollingComponent {
   void set_temperature_delta_decreasing_excess_time_min(int v) { temperature_delta_decreasing_excess_time_min_ = v; }
   void set_max_heating_time_min(int v) { max_heating_time_min_ = v; }
   void set_min_heating_time_min(int v) { min_heating_time_min_ = v; }
-  void set_relay_off_time_min(int v) { relay_off_time_min_ = v; }
+  void set_defrost_duration_min(int v) { defrost_duration_min_ = v; }
   void set_defrost_timeout_min(int v) { defrost_timeout_min_ = v; }
   void set_reset_sensor_delay_sec(int v) { reset_sensor_delay_sec_ = v; }
   void set_initialize_delay_sec(int v) { initialize_delay_sec_ = v; }
@@ -121,15 +121,15 @@ class MitsurunnerComponent : public PollingComponent {
  private:
   sensor::Sensor *heat_exchanger_sensor_{nullptr};
   sensor::Sensor *outdoor_sensor_{nullptr};
-  switch_::Switch *defrost_relay_{nullptr};
+  switch_::Switch *allow_defrost_relay_{nullptr};
   text_sensor::TextSensor *state_text_sensor_{nullptr};  // created in setup() when expose_state_text_sensor_
-  binary_sensor::BinarySensor *defrost_prevented_sensor_{nullptr};
+  binary_sensor::BinarySensor *defrost_allowed_sensor_{nullptr};
   sensor::Sensor *temperature_delta_sensor_{nullptr};
-  MitsurunnerDefrostInhibitSwitch *defrost_inhibit_switch_{nullptr};
+  MitsurunnerDefrostAllowedSwitch *defrost_allowed_switch_{nullptr};
   MitsurunnerManualDefrostSwitch *manual_defrost_switch_{nullptr};
   bool expose_state_text_sensor_{true};
   bool expose_manual_defrost_switch_{true};
-  bool defrost_prevented_{false};
+  bool defrost_allowed_{false};
   float last_temperature_delta_{0.0f};
 
   float temperature_delta_to_defrost_{-5.0f};
@@ -141,19 +141,19 @@ class MitsurunnerComponent : public PollingComponent {
   int temperature_delta_decreasing_excess_time_min_{5};
   int max_heating_time_min_{180};
   int min_heating_time_min_{50};
-  int relay_off_time_min_{30};
+  int defrost_duration_min_{30};
   int defrost_timeout_min_{10};
   int reset_sensor_delay_sec_{25};
   int initialize_delay_sec_{60};
   static constexpr float TEMP_SANITY_MIN = -60.0f;
   static constexpr float TEMP_SANITY_MAX = 60.0f;
   static constexpr uint32_t SENSOR_STALE_MS = 5 * 60 * 1000;   // 5 minutes
-  static constexpr int SENSOR_FAULT_INHIBIT_TIME_MIN = 60;
+  static constexpr int SENSOR_FAULT_NO_DEFROST_TIME_MIN = 60;
 
   MitsurunnerState state_{ST_RESET};
   MitsurunnerState previous_state_{ST_RESET};
   MitsurunnerState last_published_state_{static_cast<MitsurunnerState>(-10)};  // sentinel so first run publishes
-  bool last_published_defrost_prevented_{true};  // opposite of initial defrost_prevented_ so first run publishes
+  bool last_published_defrost_allowed_{true};  // opposite of initial defrost_allowed_ so first run publishes
   float last_published_temperature_delta_{0.0f};
   bool temperature_delta_published_{false};
   bool runner_on_{true};
@@ -181,7 +181,7 @@ class MitsurunnerComponent : public PollingComponent {
   float get_delta_min_() const;
   void push_delta_min_(float delta);
   void publish_state_text_();
-  void publish_defrost_prevented_();
+  void publish_defrost_allowed_();
   bool check_state_timer_(uint32_t now_ms);
   bool timer_elapsed_(uint32_t start_ms, uint32_t duration_ms, uint32_t now_ms) const;
   bool should_enter_off_(float heat_exchanger_temp, float outdoor_temp) const;

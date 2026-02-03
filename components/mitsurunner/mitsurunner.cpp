@@ -32,9 +32,9 @@ namespace mitsurunner {
 
 static const char *const TAG = "mitsurunner";
 
-void MitsurunnerDefrostInhibitSwitch::write_state(bool state) {
+void MitsurunnerDefrostAllowedSwitch::write_state(bool state) {
   if (component_ != nullptr) {
-    component_->set_defrost_inhibit_enabled(state);
+    component_->set_defrost_allowed_enabled(state);
   }
   publish_state(state);
 }
@@ -51,8 +51,8 @@ void MitsurunnerComponent::request_manual_defrost() {
 }
 
 void MitsurunnerComponent::setup() {
-  if (defrost_relay_ != nullptr) {
-    defrost_relay_->turn_off();
+  if (allow_defrost_relay_ != nullptr) {
+    allow_defrost_relay_->turn_off();
   }
   state_ = ST_RESET;
   previous_state_ = ST_RESET;
@@ -80,17 +80,17 @@ void MitsurunnerComponent::setup() {
     App.register_text_sensor(state_text_sensor_);
   }
 #endif
-  if (defrost_prevented_sensor_ != nullptr) {
-    defrost_prevented_sensor_->publish_state(defrost_prevented_);  // Initial state so entity is announced
-    last_published_defrost_prevented_ = defrost_prevented_;
+  if (defrost_allowed_sensor_ != nullptr) {
+    defrost_allowed_sensor_->publish_state(defrost_allowed_);  // Initial state so entity is announced
+    last_published_defrost_allowed_ = defrost_allowed_;
   }
   if (temperature_delta_sensor_ != nullptr) {
     temperature_delta_sensor_->publish_state(0.0f);  // Initial state so entity is announced
     last_published_temperature_delta_ = 0.0f;
     temperature_delta_published_ = true;
   }
-  if (defrost_inhibit_switch_ != nullptr) {
-    defrost_inhibit_switch_->publish_state(runner_on_);  // Initial state so entity is announced
+  if (defrost_allowed_switch_ != nullptr) {
+    defrost_allowed_switch_->publish_state(runner_on_);  // Initial state so entity is announced
   }
   if (expose_manual_defrost_switch_) {
     manual_defrost_switch_ = new MitsurunnerManualDefrostSwitch();
@@ -116,7 +116,7 @@ void MitsurunnerComponent::update() {
   }
   run_state_machine_(now_ms);
   publish_state_text_();
-  publish_defrost_prevented_();
+  publish_defrost_allowed_();
   if (temperature_delta_sensor_ != nullptr) {
     if (!temperature_delta_published_ || last_temperature_delta_ != last_published_temperature_delta_) {
       temperature_delta_sensor_->publish_state(last_temperature_delta_);
@@ -217,21 +217,21 @@ bool MitsurunnerComponent::sensor_fault_detected_(float heat_exchanger_temp, flo
 }
 
 void MitsurunnerComponent::enter_sensor_fault_(uint32_t now_ms) {
-  if (defrost_relay_) defrost_relay_->turn_on();
-  defrost_prevented_ = true;
+  if (allow_defrost_relay_) allow_defrost_relay_->turn_off();
+  defrost_allowed_ = false;
   previous_state_ = state_;
   state_ = ST_SENSOR_FAULT;
   sensor_fault_timer_start_ms_ = now_ms;
-  sensor_fault_timer_duration_ms_ = (uint32_t) SENSOR_FAULT_INHIBIT_TIME_MIN * 60 * 1000;
+  sensor_fault_timer_duration_ms_ = (uint32_t) SENSOR_FAULT_NO_DEFROST_TIME_MIN * 60 * 1000;
 }
 
-void MitsurunnerComponent::set_defrost_inhibit_enabled(bool enabled) {
-  runner_on_ = enabled;
-  if (!enabled) {
-    if (defrost_relay_ != nullptr) {
-      defrost_relay_->turn_off();
+void MitsurunnerComponent::set_defrost_allowed_enabled(bool allowed) {
+  runner_on_ = allowed;
+  if (!allowed) {
+    if (allow_defrost_relay_ != nullptr) {
+      allow_defrost_relay_->turn_off();
     }
-    defrost_prevented_ = false;
+    defrost_allowed_ = false;
     state_timer_duration_ms_ = 0;
     stop_forced_defrost_timer_();
     previous_state_ = state_;
@@ -240,8 +240,8 @@ void MitsurunnerComponent::set_defrost_inhibit_enabled(bool enabled) {
 }
 
 void MitsurunnerComponent::enter_reset_(uint32_t now_ms) {
-  if (defrost_relay_) defrost_relay_->turn_off();
-  defrost_prevented_ = false;
+  if (allow_defrost_relay_) allow_defrost_relay_->turn_off();
+  defrost_allowed_ = false;
   long_defrosting_ = false;
   manual_defrosting_ = false;
   previous_state_ = state_;
@@ -250,8 +250,8 @@ void MitsurunnerComponent::enter_reset_(uint32_t now_ms) {
 }
 
 void MitsurunnerComponent::enter_off_() {
-  if (defrost_relay_) defrost_relay_->turn_off();
-  defrost_prevented_ = false;
+  if (allow_defrost_relay_) allow_defrost_relay_->turn_off();
+  defrost_allowed_ = false;
   long_defrosting_ = false;
   manual_defrosting_ = false;
   state_timer_duration_ms_ = 0;
@@ -261,8 +261,8 @@ void MitsurunnerComponent::enter_off_() {
 }
 
 void MitsurunnerComponent::enter_idle_(uint32_t now_ms) {
-  if (defrost_relay_) defrost_relay_->turn_on();
-  defrost_prevented_ = true;
+  if (allow_defrost_relay_) allow_defrost_relay_->turn_off();
+  defrost_allowed_ = false;
   state_timer_duration_ms_ = 0;
   previous_state_ = state_;
   state_ = ST_IDLE;
@@ -270,24 +270,24 @@ void MitsurunnerComponent::enter_idle_(uint32_t now_ms) {
 }
 
 void MitsurunnerComponent::enter_temp_exceeded_(uint32_t now_ms) {
-  if (defrost_relay_) defrost_relay_->turn_on();
-  defrost_prevented_ = true;
+  if (allow_defrost_relay_) allow_defrost_relay_->turn_off();
+  defrost_allowed_ = false;
   previous_state_ = state_;
   state_ = ST_TEMP_EXCEEDED;
   start_state_timer_ms_((uint32_t) temperature_delta_excess_time_min_ * 60 * 1000, now_ms);
 }
 
 void MitsurunnerComponent::enter_temp_exceeded_temp_decreasing_(uint32_t now_ms) {
-  if (defrost_relay_) defrost_relay_->turn_on();
-  defrost_prevented_ = true;
+  if (allow_defrost_relay_) allow_defrost_relay_->turn_off();
+  defrost_allowed_ = false;
   previous_state_ = state_;
   state_ = ST_TEMP_EXCEEDED_TEMP_DECREASING;
   start_state_timer_ms_((uint32_t) temperature_delta_decreasing_excess_time_min_ * 60 * 1000, now_ms);
 }
 
 void MitsurunnerComponent::enter_start_defrosting_(uint32_t now_ms) {
-  if (defrost_relay_) defrost_relay_->turn_off();
-  defrost_prevented_ = false;
+  if (allow_defrost_relay_) allow_defrost_relay_->turn_on();
+  defrost_allowed_ = true;
   manual_defrosting_ = false;
   previous_state_ = state_;
   state_ = ST_START_DEFROSTING;
@@ -295,35 +295,35 @@ void MitsurunnerComponent::enter_start_defrosting_(uint32_t now_ms) {
 }
 
 void MitsurunnerComponent::enter_defrosting_started_(uint32_t now_ms) {
-  if (defrost_relay_) defrost_relay_->turn_off();
-  defrost_prevented_ = false;
+  if (allow_defrost_relay_) allow_defrost_relay_->turn_on();
+  defrost_allowed_ = true;
   long_defrosting_ = false;
   manual_defrosting_ = false;
   previous_state_ = state_;
   state_ = ST_DEFROSTING_STARTED;
-  start_state_timer_ms_((uint32_t) relay_off_time_min_ * 60 * 1000, now_ms);
+  start_state_timer_ms_((uint32_t) defrost_duration_min_ * 60 * 1000, now_ms);
   start_forced_defrost_timer_(now_ms);
 }
 
 void MitsurunnerComponent::enter_long_defrosting_started_(uint32_t now_ms) {
-  if (defrost_relay_) defrost_relay_->turn_on();
-  defrost_prevented_ = true;
+  if (allow_defrost_relay_) allow_defrost_relay_->turn_off();
+  defrost_allowed_ = false;
   long_defrosting_ = false;
   manual_defrosting_ = false;
   previous_state_ = state_;
   state_ = ST_LONG_DEFROSTING_STARTED;
-  start_state_timer_ms_((uint32_t) relay_off_time_min_ * 60 * 1000, now_ms);
+  start_state_timer_ms_((uint32_t) defrost_duration_min_ * 60 * 1000, now_ms);
   start_forced_defrost_timer_(now_ms);
 }
 
 void MitsurunnerComponent::enter_heating_min_time_(uint32_t now_ms) {
-  if (defrost_relay_) defrost_relay_->turn_on();
-  defrost_prevented_ = true;
+  if (allow_defrost_relay_) allow_defrost_relay_->turn_off();
+  defrost_allowed_ = false;
   long_defrosting_ = false;
   manual_defrosting_ = false;
   previous_state_ = state_;
   state_ = ST_HEATING_MIN_TIME;
-  start_state_timer_ms_((uint32_t) (min_heating_time_min_ - relay_off_time_min_) * 60 * 1000, now_ms);
+  start_state_timer_ms_((uint32_t) (min_heating_time_min_ - defrost_duration_min_) * 60 * 1000, now_ms);
 }
 
 void MitsurunnerComponent::publish_state_text_() {
@@ -347,11 +347,11 @@ void MitsurunnerComponent::publish_state_text_() {
   state_text_sensor_->publish_state(text);
 }
 
-void MitsurunnerComponent::publish_defrost_prevented_() {
-  if (defrost_prevented_sensor_ != nullptr &&
-      defrost_prevented_ != last_published_defrost_prevented_) {
-    last_published_defrost_prevented_ = defrost_prevented_;
-    defrost_prevented_sensor_->publish_state(defrost_prevented_);
+void MitsurunnerComponent::publish_defrost_allowed_() {
+  if (defrost_allowed_sensor_ != nullptr &&
+      defrost_allowed_ != last_published_defrost_allowed_) {
+    last_published_defrost_allowed_ = defrost_allowed_;
+    defrost_allowed_sensor_->publish_state(defrost_allowed_);
   }
 }
 
@@ -369,8 +369,8 @@ void MitsurunnerComponent::run_state_machine_(uint32_t now_ms) {
       enter_sensor_fault_(now_ms);
     } else {
       if (timer_elapsed_(sensor_fault_timer_start_ms_, sensor_fault_timer_duration_ms_, now_ms)) {
-        if (defrost_relay_) defrost_relay_->turn_off();
-        defrost_prevented_ = false;
+        if (allow_defrost_relay_) allow_defrost_relay_->turn_off();
+        defrost_allowed_ = false;
       }
     }
     last_temperature_delta_ = 0.0f;
