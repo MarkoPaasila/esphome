@@ -26,6 +26,7 @@
 #pragma once
 
 #include "esphome/components/binary_sensor/binary_sensor.h"
+#include "esphome/components/button/button.h"
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/switch/switch.h"
 #include "esphome/components/text_sensor/text_sensor.h"
@@ -50,12 +51,12 @@ class MitsurunnerDefrostAllowedSwitch : public switch_::Switch {
   MitsurunnerComponent *component_{nullptr};
 };
 
-class MitsurunnerManualDefrostSwitch : public switch_::Switch {
+class MitsurunnerDefrostNowButton : public button::Button {
  public:
   void set_component(MitsurunnerComponent *component) { component_ = component; }
 
  protected:
-  void write_state(bool state) override;
+  void press_action() override;
 
  private:
   MitsurunnerComponent *component_{nullptr};
@@ -87,7 +88,6 @@ class MitsurunnerComponent : public PollingComponent {
   void set_defrost_allowed_switch(MitsurunnerDefrostAllowedSwitch *s) {
     defrost_allowed_switch_ = s;
   }
-  void set_expose_manual_defrost_switch(bool b) { expose_manual_defrost_switch_ = b; }
 
   void set_defrost_allowed_enabled(bool allowed);
 
@@ -126,8 +126,6 @@ class MitsurunnerComponent : public PollingComponent {
   binary_sensor::BinarySensor *defrost_allowed_sensor_{nullptr};
   sensor::Sensor *temperature_delta_sensor_{nullptr};
   MitsurunnerDefrostAllowedSwitch *defrost_allowed_switch_{nullptr};
-  MitsurunnerManualDefrostSwitch *manual_defrost_switch_{nullptr};
-  bool expose_manual_defrost_switch_{true};
   bool defrost_allowed_{false};
   float last_temperature_delta_{0.0f};
 

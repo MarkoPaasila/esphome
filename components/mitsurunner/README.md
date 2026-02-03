@@ -18,7 +18,9 @@ mitsurunner:
   # update_interval: 60s                                       # How often the state machine runs (default 60s)
   # smart_defrost_logic_state:                                 # Optional: expose defrost logic state as text sensor (name default: "Smart Defrost Logic State")
   #   name: "Smart Defrost Logic State"
-  # expose_manual_defrost_switch: true                         # Expose "Manual defrost request" switch (default true)
+  # defrost_now:                                               # Optional: button to request manual defrost now (only created if configured)
+  #   name: "Defrost Now"                                      # default
+  #   id: defrost_now                                          # optional id
   # temperature_delta_to_defrost: -5.0                           # Coil vs outdoor delta below which we consider defrost (default -5.0)
   # outdoor_temperature_to_enter_off_state: 3.0                   # Outdoor temp above this: disable defrost logic (default 3.0)
   # outdoor_temperature_to_exit_off_state: 2.0                   # Outdoor temp below this: re-enable (hysteresis) (default 2.0)

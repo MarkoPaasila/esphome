@@ -60,6 +60,8 @@ mitsurunner:
     name: "Outdoor Coil Temperature Delta"
   smart_defrost_logic:
     name: "Smart Defrost Logic"
+  defrost_now:
+    name: "Defrost Now"
 
 sensor:
 # ----------------- PZEM ------------------ #

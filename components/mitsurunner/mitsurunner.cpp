@@ -39,11 +39,10 @@ void MitsurunnerDefrostAllowedSwitch::write_state(bool state) {
   publish_state(state);
 }
 
-void MitsurunnerManualDefrostSwitch::write_state(bool state) {
-  if (component_ != nullptr && state) {
+void MitsurunnerDefrostNowButton::press_action() {
+  if (component_ != nullptr) {
     component_->request_manual_defrost();
   }
-  publish_state(false);
 }
 
 void MitsurunnerComponent::request_manual_defrost() {
@@ -84,13 +83,6 @@ void MitsurunnerComponent::setup() {
   }
   if (defrost_allowed_switch_ != nullptr) {
     defrost_allowed_switch_->publish_state(runner_on_);  // Initial state so entity is announced
-  }
-  if (expose_manual_defrost_switch_) {
-    manual_defrost_switch_ = new MitsurunnerManualDefrostSwitch();
-    manual_defrost_switch_->set_name("Manual defrost request");
-    manual_defrost_switch_->set_component(this);
-    manual_defrost_switch_->publish_state(false);
-    App.register_switch(manual_defrost_switch_);
   }
   enter_reset_(millis());
 }

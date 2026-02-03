@@ -25,7 +25,7 @@
 
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.components import binary_sensor, sensor, switch, text_sensor
+from esphome.components import binary_sensor, button, sensor, switch, text_sensor
 from esphome.const import (
     CONF_ID,
     CONF_NAME,
@@ -36,7 +36,7 @@ from esphome.const import (
 )
 
 CODEOWNERS = ["@lampopumput"]
-DEPENDENCIES = ["sensor", "switch", "text_sensor", "binary_sensor"]
+DEPENDENCIES = ["sensor", "switch", "text_sensor", "binary_sensor", "button"]
 
 CONF_HEAT_EXCHANGER_TEMPERATURE_SENSOR = "heat_exchanger_temperature_sensor_id"
 CONF_OUTDOOR_TEMPERATURE_SENSOR = "outdoor_temperature_sensor_id"
@@ -45,7 +45,7 @@ CONF_SMART_DEFROST_LOGIC_STATE = "smart_defrost_logic_state"
 CONF_DEFROST_ALLOWED_SENSOR = "defrost_allowed_sensor"
 CONF_TEMPERATURE_DELTA_SENSOR = "temperature_delta_sensor"
 CONF_SMART_DEFROST_LOGIC = "smart_defrost_logic"
-CONF_EXPOSE_MANUAL_DEFROST_SWITCH = "expose_manual_defrost_switch"
+CONF_DEFROST_NOW = "defrost_now"
 
 # Optional timing/threshold constants (from constants.h)
 CONF_TEMPERATURE_DELTA_TO_DEFROST = "temperature_delta_to_defrost"
@@ -66,6 +66,9 @@ mitsurunner_ns = cg.esphome_ns.namespace("mitsurunner")
 MitsurunnerComponent = mitsurunner_ns.class_("MitsurunnerComponent", cg.Component, cg.PollingComponent)
 MitsurunnerDefrostAllowedSwitch = mitsurunner_ns.class_(
     "MitsurunnerDefrostAllowedSwitch", switch.Switch
+)
+MitsurunnerDefrostNowButton = mitsurunner_ns.class_(
+    "MitsurunnerDefrostNowButton", button.Button
 )
 
 
@@ -103,7 +106,9 @@ CONFIG_SCHEMA = cv.All(
             cv.Optional(CONF_SMART_DEFROST_LOGIC): switch.switch_schema(
                 MitsurunnerDefrostAllowedSwitch
             ),
-            cv.Optional(CONF_EXPOSE_MANUAL_DEFROST_SWITCH, default=True): cv.boolean,
+            cv.Optional(CONF_DEFROST_NOW): button.button_schema(
+                MitsurunnerDefrostNowButton
+            ),
             cv.Optional(CONF_TEMPERATURE_DELTA_TO_DEFROST, default=-5.0): cv.float_,
             cv.Optional(CONF_OUTDOOR_TEMPERATURE_TO_ENTER_OFF_STATE, default=3.0): cv.float_,
             cv.Optional(CONF_OUTDOOR_TEMPERATURE_TO_EXIT_OFF_STATE, default=2.0): cv.float_,
@@ -166,4 +171,9 @@ async def to_code(config):
         defrost_sw = await switch.new_switch(config[CONF_SMART_DEFROST_LOGIC])
         cg.add(defrost_sw.set_component(var))
         cg.add(var.set_defrost_allowed_switch(defrost_sw))
-    cg.add(var.set_expose_manual_defrost_switch(config[CONF_EXPOSE_MANUAL_DEFROST_SWITCH]))
+    if CONF_DEFROST_NOW in config:
+        defrost_now_conf = dict(config[CONF_DEFROST_NOW])
+        if CONF_NAME not in defrost_now_conf or defrost_now_conf[CONF_NAME] is None:
+            defrost_now_conf[CONF_NAME] = "Defrost Now"
+        defrost_now_btn = await button.new_button(defrost_now_conf)
+        cg.add(defrost_now_btn.set_component(var))
