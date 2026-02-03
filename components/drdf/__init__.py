@@ -1,0 +1,31 @@
+"""DRDF (Dynamic Reversals based Deadband Filter) sensor filter for ESPHome."""
+
+import esphome.codegen as cg
+import esphome.config_validation as cv
+from esphome.components import sensor
+from esphome.const import CONF_ALPHA
+
+DEPENDENCIES = ["sensor"]
+
+CONF_EMA_MULTIPLIER = "ema_multiplier"
+
+drdf_ns = cg.esphome_ns.namespace("drdf")
+DrdfFilter = drdf_ns.class_("DrdfFilter", sensor.Filter)
+
+DRDF_SCHEMA = cv.Schema(
+    {
+        cv.Optional(CONF_ALPHA, default=0.01): cv.positive_float,
+        cv.Optional(CONF_EMA_MULTIPLIER, default=3.82): cv.positive_float,
+    }
+)
+
+
+@sensor.FILTER_REGISTRY.register("drdf", DrdfFilter, DRDF_SCHEMA)
+async def drdf_filter_to_code(config, filter_id):
+    """Generate the DRDF filter C++ code."""
+    var = cg.new_Pvariable(
+        filter_id,
+        config.get(CONF_ALPHA, 0.01),
+        config.get(CONF_EMA_MULTIPLIER, 3.82),
+    )
+    return var

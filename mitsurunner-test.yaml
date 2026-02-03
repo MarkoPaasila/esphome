@@ -221,7 +221,7 @@ external_components:
 #      ref: hp-ukf
 #    components: [ hp_ukf ]
 #    refresh: 0s
-  - source: 
+  - source:
       type: local
       path: components
     components: [ mitsurunner ]
