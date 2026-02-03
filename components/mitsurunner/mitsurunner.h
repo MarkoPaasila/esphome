@@ -69,7 +69,7 @@ enum MitsurunnerState {
   ST_OFF = -3,
   ST_DEFROSTING_STARTED = -2,
   ST_HEATING_MIN_TIME = -1,
-  ST_IDLE = 0,
+  ST_PREVENT_DEFROST = 0,
   ST_TEMP_EXCEEDED = 1,
   ST_TEMP_EXCEEDED_TEMP_DECREASING = 2,
   ST_START_DEFROSTING = 3,
@@ -189,7 +189,7 @@ class MitsurunnerComponent : public PollingComponent {
   void enter_sensor_fault_(uint32_t now_ms);
   void enter_reset_(uint32_t now_ms);
   void enter_off_();
-  void enter_idle_(uint32_t now_ms);
+  void enter_prevent_defrost_(uint32_t now_ms);
   void enter_temp_exceeded_(uint32_t now_ms);
   void enter_temp_exceeded_temp_decreasing_(uint32_t now_ms);
   void enter_start_defrosting_(uint32_t now_ms);

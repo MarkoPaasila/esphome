@@ -48,29 +48,29 @@ mitsurunner:
 
 - **Temperature delta** = heat exchanger temperature − outdoor temperature. Negative means the coil is colder than ambient (frost condition).
 
-- **Startup:** Relay is off (unit sees real NTC). After `initialize_delay_sec`, the component waits `reset_sensor_delay_sec` in **Reset**, then goes to **Off**, **Defrosting** (if delta already high), or **Idle**.
+- **Startup:** Relay is off (unit sees real NTC). After `initialize_delay_sec`, the component waits `reset_sensor_delay_sec` in **Reset**, then goes to **Off**, **Defrosting** (if delta already high), or **Prevent defrost**.
 
 - **Off**  
   Enter when: outdoor > `outdoor_temperature_to_enter_off_state`, or heat exchanger > `heat_exchanger_max_temperature`, or smart-defrost switch is off.  
-  Relay off. Exit when outdoor < `outdoor_temperature_to_exit_off_state`, coil < max temp, and smart-defrost is on → **Idle**.
+  Relay off. Exit when outdoor < `outdoor_temperature_to_exit_off_state`, coil < max temp, and smart-defrost is on → **Prevent defrost**.
 
-- **Idle**  
+- **Prevent defrost**  
   Relay off. A “max heating” timer runs; if it reaches `max_heating_time_min` or user triggers manual defrost → **Start defrosting**. If delta ≤ `temperature_delta_to_defrost` → **Temp exceeded**.
 
 - **Temp exceeded**  
-  Delta is below threshold (frost likely). Relay still off. Waits `temperature_delta_excess_time_min`. Then: if delta is improving (min over a short window) and time passed → **Temp exceeded (decreasing)**; if not improving and time passed (or max heating / manual) → **Start defrosting**; if delta rises above threshold → **Idle**.
+  Delta is below threshold (frost likely). Relay still off. Waits `temperature_delta_excess_time_min`. Then: if delta is improving (min over a short window) and time passed → **Temp exceeded (decreasing)**; if not improving and time passed (or max heating / manual) → **Start defrosting**; if delta rises above threshold → **Prevent defrost**.
 
 - **Temp exceeded (decreasing)**  
-  Shorter wait `temperature_delta_decreasing_excess_time_min`. If delta > threshold → **Idle**. If time passed or max heating or manual → **Start defrosting**.
+  Shorter wait `temperature_delta_decreasing_excess_time_min`. If delta > threshold → **Prevent defrost**. If time passed or max heating or manual → **Start defrosting**.
 
 - **Start defrosting**  
-  Relay **on** (unit sees 33 kΩ, can start defrost). If delta rises to ≥ `temperature_delta_defrosting_started` → **Defrosting started**. If `defrost_timeout_min` passes without that → **Long defrosting started** (relay off again; unit may defrost on its own).
+  Relay **on** (unit sees NT, can start defrost). If delta rises to ≥ `temperature_delta_defrosting_started` → **Defrosting started**. If `defrost_timeout_min` passes without that → **Long defrosting started** (relay off again; unit may defrost on its own).
 
 - **Defrosting started / Long defrosting started**  
   After `defrost_duration_min` → **Forced heating** (relay off, minimum heating time).
 
 - **Forced heating**  
-  Relay off for `min_heating_time_min - defrost_duration_min` to avoid immediate re-defrost. Then → **Idle**. If max heating time is reached during this period → **Start defrosting** again.
+  Relay off for `min_heating_time_min - defrost_duration_min` to avoid immediate re-defrost. Then → **Prevent defrost**. If max heating time is reached during this period → **Start defrosting** again.
 
 - **Sensor fault**  
   If sensors are missing, out of range, or outdoor sensor is stale (e.g. > 5 min), defrost is disallowed (relay off). After 60 minutes in fault, relay is forced off. Recovery goes to **Off** or **Reset** depending on temperatures.

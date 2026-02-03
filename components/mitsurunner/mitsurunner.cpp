@@ -245,12 +245,12 @@ void MitsurunnerComponent::enter_off_() {
   state_ = ST_OFF;
 }
 
-void MitsurunnerComponent::enter_idle_(uint32_t now_ms) {
+void MitsurunnerComponent::enter_prevent_defrost_(uint32_t now_ms) {
   if (allow_defrost_relay_) allow_defrost_relay_->turn_off();
   defrost_allowed_ = false;
   state_timer_duration_ms_ = 0;
   previous_state_ = state_;
-  state_ = ST_IDLE;
+  state_ = ST_PREVENT_DEFROST;
   start_forced_defrost_timer_(now_ms);
 }
 
@@ -323,7 +323,7 @@ void MitsurunnerComponent::publish_state_text_() {
     case ST_OFF: text = "Off"; break;
     case ST_DEFROSTING_STARTED: text = "Defrosting"; break;
     case ST_HEATING_MIN_TIME: text = "Forced heating"; break;
-    case ST_IDLE: text = "Idle"; break;
+    case ST_PREVENT_DEFROST: text = "Prevent defrost"; break;
     case ST_TEMP_EXCEEDED: text = "Temp exceeded"; break;
     case ST_TEMP_EXCEEDED_TEMP_DECREASING: text = "Temp exceeded - decreasing"; break;
     case ST_START_DEFROSTING: text = "Starting defrosting"; break;
@@ -393,12 +393,12 @@ void MitsurunnerComponent::run_state_machine_(uint32_t now_ms) {
         } else if (temperature_delta >= temperature_delta_defrosting_started_) {
           enter_defrosting_started_(now_ms);
         } else {
-          enter_idle_(now_ms);
+          enter_prevent_defrost_(now_ms);
         }
       }
       break;
 
-    case ST_IDLE:
+    case ST_PREVENT_DEFROST:
       if (should_enter_off_(heat_exchanger_temp, outdoor_temp)) {
         enter_off_();
       } else if (max_heating_time_passed_ || manual_defrosting_) {
@@ -413,7 +413,7 @@ void MitsurunnerComponent::run_state_machine_(uint32_t now_ms) {
       if (heat_exchanger_temp < heat_exchanger_max_temperature_ &&
           outdoor_temp < outdoor_temperature_to_exit_off_state_ && runner_on_) {
         start_forced_defrost_timer_(now_ms);
-        enter_idle_(now_ms);
+        enter_prevent_defrost_(now_ms);
       }
       break;
 
@@ -425,20 +425,20 @@ void MitsurunnerComponent::run_state_machine_(uint32_t now_ms) {
         } else if (delta_min >= temperature_delta && state_time_passed_) {
           enter_temp_exceeded_temp_decreasing_(now_ms);
         } else if (temperature_delta > temperature_delta_to_defrost_) {
-          enter_idle_(now_ms);
+          enter_prevent_defrost_(now_ms);
         }
       } else {
         if (max_heating_time_passed_ || manual_defrosting_) {
           enter_start_defrosting_(now_ms);
         } else if (temperature_delta > temperature_delta_to_defrost_) {
-          enter_idle_(now_ms);
+          enter_prevent_defrost_(now_ms);
         }
       }
       break;
 
     case ST_TEMP_EXCEEDED_TEMP_DECREASING:
       if (temperature_delta > temperature_delta_to_defrost_) {
-        enter_idle_(now_ms);
+        enter_prevent_defrost_(now_ms);
       } else if (max_heating_time_passed_ || state_time_passed_ || manual_defrosting_) {
         enter_start_defrosting_(now_ms);
       }
@@ -466,14 +466,14 @@ void MitsurunnerComponent::run_state_machine_(uint32_t now_ms) {
 
     case ST_HEATING_MIN_TIME:
       if (state_time_passed_) {
-        enter_idle_(now_ms);
+        enter_prevent_defrost_(now_ms);
       } else if (max_heating_time_passed_) {
         enter_start_defrosting_(now_ms);
       }
       break;
 
     default:
-      enter_idle_(now_ms);
+      enter_prevent_defrost_(now_ms);
       break;
   }
 }
