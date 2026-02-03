@@ -564,8 +564,11 @@ void HpUkfFilter::update(const float *z, const bool *mask) {
       P_[i * dim + j] = P_tmp[i * dim + j] + KRK;
     }
 
-  // EM auto-tune: R adaptation then Q adaptation (diagonal, with forgetting factors).
+  // EM auto-tune: R adaptation then Q adaptation (diagonal, with forgetting factors and warmup ramp).
   if (em_enabled_) {
+    float ramp = (em_warmup_steps_ == 0)
+                     ? 1.0f
+                     : std::min(1.0f, (float) (em_update_count_ + 1) / (float) em_warmup_steps_);
     for (int i = 0; i < m_avail; i++) {
       int g = idx[i];
       float lambda_r = (g <= 1) ? em_lambda_r_inlet_ : em_lambda_r_outlet_;
@@ -574,7 +577,8 @@ void HpUkfFilter::update(const float *z, const bool *mask) {
         r_est = R_MIN;
       r_est *= (1.0f + em_inflation_);
       float r_old = R_[g * M + g];
-      R_[g * M + g] = lambda_r * r_old + (1.0f - lambda_r) * r_est;
+      float w_new_r = (1.0f - lambda_r) * ramp;
+      R_[g * M + g] = (1.0f - w_new_r) * r_old + w_new_r * r_est;
       if (R_[g * M + g] < R_MIN)
         R_[g * M + g] = R_MIN;
     }
@@ -584,10 +588,12 @@ void HpUkfFilter::update(const float *z, const bool *mask) {
         q_est = Q_MIN;
       q_est *= (1.0f + em_inflation_);
       float q_old = Q_[j * dim + j];
-      Q_[j * dim + j] = em_lambda_q_ * q_old + (1.0f - em_lambda_q_) * q_est;
+      float w_new_q = (1.0f - em_lambda_q_) * ramp;
+      Q_[j * dim + j] = (1.0f - w_new_q) * q_old + w_new_q * q_est;
       if (Q_[j * dim + j] < Q_MIN)
         Q_[j * dim + j] = Q_MIN;
     }
+    em_update_count_++;
   }
   if (n_ >= 7) {
     int tvcoil_idx = (n_ == 7) ? 6 : 10;

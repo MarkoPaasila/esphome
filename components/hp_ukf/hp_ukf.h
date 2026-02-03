@@ -78,6 +78,7 @@ class HpUkfComponent : public PollingComponent {
   void set_em_lambda_r_inlet(float v) { em_lambda_r_inlet_ = v; }
   void set_em_lambda_r_outlet(float v) { em_lambda_r_outlet_ = v; }
   void set_em_inflation(float v) { em_inflation_ = v; }
+  void set_em_warmup_steps(uint32_t v) { em_warmup_steps_ = v; }
 
   void set_em_q_t_in_sensor(sensor::Sensor *s) { em_q_t_in_ = s; }
   void set_em_q_rh_in_sensor(sensor::Sensor *s) { em_q_rh_in_ = s; }
@@ -166,6 +167,7 @@ class HpUkfComponent : public PollingComponent {
   float em_lambda_r_inlet_{0.998f};
   float em_lambda_r_outlet_{0.98f};
   float em_inflation_{0.5f};
+  uint32_t em_warmup_steps_{20};
 
   sensor::Sensor *em_q_t_in_{nullptr};
   sensor::Sensor *em_q_rh_in_{nullptr};

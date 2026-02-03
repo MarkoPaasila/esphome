@@ -442,6 +442,7 @@ void HpUkfComponent::setup() {
     filter_.set_em_lambda_r_inlet(em_lambda_r_inlet_);
     filter_.set_em_lambda_r_outlet(em_lambda_r_outlet_);
     filter_.set_em_inflation(em_inflation_);
+    filter_.set_em_warmup_steps(em_warmup_steps_);
   }
 
   // Publish initial state so sensors show values immediately (avoids NaN/unknown
@@ -752,8 +753,8 @@ void HpUkfComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "  Atmospheric pressure: %.2f hPa", pressure_pa_ / 100.0f);
   ESP_LOGCONFIG(TAG, "  EM auto-tune: %s", em_autotune_ ? "enabled" : "disabled");
   if (em_autotune_) {
-    ESP_LOGCONFIG(TAG, "  EM lambda_q=%.3f, lambda_r_inlet=%.3f, lambda_r_outlet=%.3f, inflation=%.2f",
-                  em_lambda_q_, em_lambda_r_inlet_, em_lambda_r_outlet_, em_inflation_);
+    ESP_LOGCONFIG(TAG, "  EM lambda_q=%.3f, lambda_r_inlet=%.3f, lambda_r_outlet=%.3f, inflation=%.2f, warmup_steps=%u",
+                  em_lambda_q_, em_lambda_r_inlet_, em_lambda_r_outlet_, em_inflation_, (unsigned) em_warmup_steps_);
     int em_sensors = (em_q_t_in_ ? 1 : 0) + (em_q_rh_in_ ? 1 : 0) + (em_q_t_out_ ? 1 : 0) + (em_q_rh_out_ ? 1 : 0)
         + (em_r_t_in_ ? 1 : 0) + (em_r_rh_in_ ? 1 : 0) + (em_r_t_out_ ? 1 : 0) + (em_r_rh_out_ ? 1 : 0);
     ESP_LOGCONFIG(TAG, "  EM Q/R sensors configured: %d", em_sensors);
