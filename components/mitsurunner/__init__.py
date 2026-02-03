@@ -25,9 +25,10 @@
 
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.components import binary_sensor, sensor, switch
+from esphome.components import binary_sensor, sensor, switch, text_sensor
 from esphome.const import (
     CONF_ID,
+    CONF_NAME,
     CONF_UPDATE_INTERVAL,
     DEVICE_CLASS_TEMPERATURE,
     STATE_CLASS_MEASUREMENT,
@@ -40,7 +41,7 @@ DEPENDENCIES = ["sensor", "switch", "text_sensor", "binary_sensor"]
 CONF_HEAT_EXCHANGER_TEMPERATURE_SENSOR = "heat_exchanger_temperature_sensor_id"
 CONF_OUTDOOR_TEMPERATURE_SENSOR = "outdoor_temperature_sensor_id"
 CONF_DEFROST_RELAY = "defrost_relay_id"
-CONF_EXPOSE_STATE_TEXT_SENSOR = "expose_state_text_sensor"
+CONF_SMART_DEFROST_LOGIC_STATE = "smart_defrost_logic_state"
 CONF_DEFROST_ALLOWED_SENSOR = "defrost_allowed_sensor"
 CONF_TEMPERATURE_DELTA_SENSOR = "temperature_delta_sensor"
 CONF_SMART_DEFROST_LOGIC = "smart_defrost_logic"
@@ -91,7 +92,7 @@ CONFIG_SCHEMA = cv.All(
             cv.Required(CONF_OUTDOOR_TEMPERATURE_SENSOR): cv.use_id(sensor.Sensor),
             cv.Required(CONF_DEFROST_RELAY): cv.use_id(switch.Switch),
             cv.Optional(CONF_UPDATE_INTERVAL, default="60s"): cv.update_interval,
-            cv.Optional(CONF_EXPOSE_STATE_TEXT_SENSOR, default=True): cv.boolean,
+            cv.Optional(CONF_SMART_DEFROST_LOGIC_STATE): text_sensor.text_sensor_schema(),
             cv.Optional(CONF_DEFROST_ALLOWED_SENSOR): binary_sensor.binary_sensor_schema(),
             cv.Optional(CONF_TEMPERATURE_DELTA_SENSOR): sensor.sensor_schema(
                 unit_of_measurement=UNIT_CELSIUS,
@@ -147,7 +148,12 @@ async def to_code(config):
     cg.add(var.set_defrost_timeout_min(config[CONF_DEFROST_TIMEOUT_MIN]))
     cg.add(var.set_reset_sensor_delay_sec(config[CONF_RESET_SENSOR_DELAY_SEC]))
     cg.add(var.set_initialize_delay_sec(config[CONF_INITIALIZE_DELAY_SEC]))
-    cg.add(var.set_expose_state_text_sensor(config[CONF_EXPOSE_STATE_TEXT_SENSOR]))
+    if CONF_SMART_DEFROST_LOGIC_STATE in config:
+        state_conf = dict(config[CONF_SMART_DEFROST_LOGIC_STATE])
+        if CONF_NAME not in state_conf or state_conf[CONF_NAME] is None:
+            state_conf[CONF_NAME] = "Smart Defrost Logic State"
+        state_ts = await text_sensor.new_text_sensor(state_conf)
+        cg.add(var.set_state_text_sensor(state_ts))
     if CONF_DEFROST_ALLOWED_SENSOR in config:
         defrost_bs = await binary_sensor.new_binary_sensor(
             config[CONF_DEFROST_ALLOWED_SENSOR]

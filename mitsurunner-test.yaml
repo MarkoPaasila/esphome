@@ -35,6 +35,8 @@ mitsurunner:
   heat_exchanger_temperature_sensor_id: heat_exchanger_temp
   outdoor_temperature_sensor_id: outdoor_temp
   defrost_relay_id: allow_defrost_relay
+  smart_defrost_logic_state:
+    name: "Smart Defrost Logic State"
   # Optional: update_interval (default 60s = state machine runs once per minute)
   # update_interval: 60s
   # Optional: all thresholds and times below (defaults match constants.h)

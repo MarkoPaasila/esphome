@@ -73,13 +73,6 @@ void MitsurunnerComponent::setup() {
   boot_complete_start_ms_ = millis();
   boot_complete_duration_ms_ = (uint32_t) initialize_delay_sec_ * 1000;
 
-#ifdef USE_TEXT_SENSOR
-  if (expose_state_text_sensor_) {
-    state_text_sensor_ = new text_sensor::TextSensor();
-    state_text_sensor_->set_name("State");
-    App.register_text_sensor(state_text_sensor_);
-  }
-#endif
   if (defrost_allowed_sensor_ != nullptr) {
     defrost_allowed_sensor_->publish_state(defrost_allowed_);  // Initial state so entity is announced
     last_published_defrost_allowed_ = defrost_allowed_;
@@ -327,7 +320,7 @@ void MitsurunnerComponent::enter_heating_min_time_(uint32_t now_ms) {
 }
 
 void MitsurunnerComponent::publish_state_text_() {
-  if (!expose_state_text_sensor_ || state_text_sensor_ == nullptr) return;
+  if (state_text_sensor_ == nullptr) return;
   if (state_ == last_published_state_) return;
   last_published_state_ = state_;
   const char *text = "Internal error";

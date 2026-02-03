@@ -79,7 +79,7 @@ class MitsurunnerComponent : public PollingComponent {
   void set_heat_exchanger_sensor(sensor::Sensor *s) { heat_exchanger_sensor_ = s; }
   void set_outdoor_sensor(sensor::Sensor *s) { outdoor_sensor_ = s; }
   void set_allow_defrost_relay(switch_::Switch *s) { allow_defrost_relay_ = s; }
-  void set_expose_state_text_sensor(bool b) { expose_state_text_sensor_ = b; }
+  void set_state_text_sensor(text_sensor::TextSensor *s) { state_text_sensor_ = s; }
   void set_defrost_allowed_sensor(binary_sensor::BinarySensor *s) {
     defrost_allowed_sensor_ = s;
   }
@@ -122,12 +122,11 @@ class MitsurunnerComponent : public PollingComponent {
   sensor::Sensor *heat_exchanger_sensor_{nullptr};
   sensor::Sensor *outdoor_sensor_{nullptr};
   switch_::Switch *allow_defrost_relay_{nullptr};
-  text_sensor::TextSensor *state_text_sensor_{nullptr};  // created in setup() when expose_state_text_sensor_
+  text_sensor::TextSensor *state_text_sensor_{nullptr};  // set from config when smart_defrost_logic_state is configured
   binary_sensor::BinarySensor *defrost_allowed_sensor_{nullptr};
   sensor::Sensor *temperature_delta_sensor_{nullptr};
   MitsurunnerDefrostAllowedSwitch *defrost_allowed_switch_{nullptr};
   MitsurunnerManualDefrostSwitch *manual_defrost_switch_{nullptr};
-  bool expose_state_text_sensor_{true};
   bool expose_manual_defrost_switch_{true};
   bool defrost_allowed_{false};
   float last_temperature_delta_{0.0f};
