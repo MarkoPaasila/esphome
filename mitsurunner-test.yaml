@@ -1,0 +1,249 @@
+#hp_ukf:
+#  id: ukf
+#  update_interval: 10s
+#  inlet_temperature: tin
+#  inlet_humidity: hin
+#  outlet_temperature: tout
+#  outlet_humidity: hout
+#  track_temperature_derivatives: true
+
+climate:
+  - platform: cn105
+    id: hp
+    name: MSZ-FD25
+    uart_id: HP_UART
+    update_interval: 1200ms
+    visual:
+      min_temperature: 16.0
+      max_temperature: 31.0
+      temperature_step: 1.0
+    compressor_frequency_sensor:
+      name: "Compressor frequency"
+    vertical_vane_select:
+      name: "Vertical Vane Orientation"
+    horizontal_vane_select:
+      name: "Horizontal Vane Orientation"
+
+mitsurunner:
+  heat_exchanger_temperature_sensor_id: heat_exchanger_temp
+  outdoor_temperature_sensor_id: outdoor_temp
+  defrost_relay_id: defrost_relay
+  # Optional: update_interval (default 60s = state machine runs once per minute)
+  # update_interval: 60s
+  # Optional: all thresholds and times below (defaults match constants.h)
+  temperature_delta_to_defrost: 8.0
+  # outdoor_temperature_to_enter_off_state: 3.0
+  # outdoor_temperature_to_exit_off_state: 2.0
+  # heat_exchanger_max_temperature: 10.0
+  # temperature_delta_defrosting_started: -1.0
+  # temperature_delta_excess_time_min: 8
+  # temperature_delta_decreasing_excess_time_min: 5
+  # max_heating_time_min: 180
+  # min_heating_time_min: 50
+  # relay_off_time_min: 30
+  # defrost_timeout_min: 10
+  # reset_sensor_delay_sec: 25
+  # initialize_delay_sec: 60
+  defrost_prevented_sensor:
+    name: "Defrost Prevented"
+  temperature_delta_sensor:
+    name: "Outdoor Coil Temperature Delta"
+  defrost_inhibit_switch:
+    name: "Defrost inhibiting"
+
+sensor:
+# ----------------- PZEM ------------------ #
+  - platform: pzemac
+    update_interval: 10s
+    modbus_id: mbus
+    voltage:
+      name: "Voltage"
+      filters:
+        - throttle_average: 60s
+    energy:
+      name: "Energy"
+      unit_of_measurement: "kWh"
+      device_class: energy
+      icon: mdi:flash-outline
+      state_class: total_increasing
+      accuracy_decimals: 3
+      filters:
+        - lambda: return x / 1000.0;
+        - delta: 0.1
+    power:
+      name: "Power"
+      id: power
+      unit_of_measurement: "W"
+      icon: mdi:flash-outline
+      device_class: power
+      state_class: measurement
+      accuracy_decimals: 0
+      filters:
+        - throttle_average: 60s
+        - delta: 2%
+        - delta: 50
+#    frequency:
+#      name: "Frequency"
+#    power_factor:
+#      name: "Power Factor"
+#    current:
+#      name: "Current"
+
+# -------------- SHT30 ------------------ #
+  - platform: sht3xd
+    i2c_id: i2c0
+    update_interval: 10s
+    temperature:
+      id: tin
+      filters:
+        - throttle_average: 60s
+    humidity:
+      id: hin
+      filters:
+        - throttle_average: 60s
+  - platform: sht3xd
+    i2c_id: i2c1
+    update_interval: 10s
+    temperature:
+      id: tout
+      filters:
+        - throttle_average: 60s
+    humidity:
+      id: hout
+      filters:
+        - throttle_average: 60s
+
+# ------------- DS18B20 ------------------ #
+  - id: heat_exchanger_temp
+    name: "Outdoor unit heat exchanger temperature"
+    platform: dallas_temp
+    address: 0xa4b32d851e64ff28
+    accuracy_decimals: 2
+    device_class: temperature
+    state_class: measurement
+    update_interval: 10s
+    filters:
+      - throttle_average: 60s
+  - id: outdoor_temp
+    name: "Outdoor temperature"
+    platform: dallas_temp
+    address: 0x00ca55851e64ff28
+    accuracy_decimals: 2
+    device_class: temperature
+    state_class: measurement
+    update_interval: 10s
+    filters:
+      - throttle_average: 60s
+
+# ------------- Other --------------------- #
+#  - platform: debug
+#    free:
+#      name: "Heap Free"
+#      filters:
+#        - throttle_average: 60s
+#    block:
+#      name: "Heap Max Block"
+#      filters:
+#        - throttle_average: 60s
+#    loop_time:
+#      name: "Loop Time"
+#      filters:
+#        - max:
+#            window_size: 60
+#            send_every: 60
+
+# --------------- Relays ---------------- #
+switch:
+  - platform: gpio
+    pin:
+      number: 23
+      inverted: false
+    name: "Allow Defrost Relay"
+    id: defrost_relay
+    on_turn_on:
+      then:
+        - switch.turn_off: heater_relay
+    on_turn_off:
+      if:
+        condition:
+          sensor.in_range:
+            id: outdoor_temp
+            below: 0.0
+        then:
+          - switch.turn_on: heater_relay
+  - platform: gpio
+    pin: 
+      number: 18
+      inverted: false
+    name: "Allow Bottom Heater Relay"
+    id: heater_relay
+
+text_sensor:
+  - platform: debug
+    device:
+      name: "Device Info"
+    reset_reason:
+      name: "Reset Reason"
+
+debug:
+  update_interval: 10s
+
+substitutions:
+  name: "fd25"
+
+esp32:
+  variant: ESP32
+
+packages:
+  - !include z-basics.yaml
+
+wifi:
+  use_address: 10.0.0.231
+
+external_components:
+  - source: github://echavet/MitsubishiCN105ESPHome
+    refresh: 0s
+#  - source:
+#      type: git
+#      url: https://github.com/MarkoPaasila/esphome-snippets
+#      ref: hp-ukf
+#    components: [ hp_ukf ]
+#    refresh: 0s
+  - source: 
+      type: local
+      path: components
+    components: [ mitsurunner ]
+    refresh: 0s
+
+one_wire:
+  - platform: gpio
+    pin: 19
+
+i2c:
+  - id: i2c1
+    sda: 33
+    scl: 32
+    scan: true
+    frequency: 100kHz
+  - id: i2c0
+    sda: 27
+    scl: 26
+    scan: true
+    frequency: 100kHz
+
+uart:
+  - id: pzem_uart
+    tx_pin: 17
+    rx_pin: 16
+    baud_rate: 9600
+    stop_bits: 1
+    debug:
+  - id: HP_UART
+    tx_pin: 1
+    rx_pin: 3
+    baud_rate: 2400
+
+modbus:
+  id: mbus
+  uart_id: pzem_uart
+  disable_crc: true
