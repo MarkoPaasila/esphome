@@ -41,8 +41,8 @@ mitsurunner:
   # update_interval: 60s
   # Optional: all thresholds and times below (defaults match constants.h)
   temperature_delta_to_defrost: -8.0
-  # outdoor_temperature_to_enter_off_state: 3.0
-  # outdoor_temperature_to_exit_off_state: 2.0
+  # outdoor_temperature_to_enter_deactivated_state: 3.0
+  # outdoor_temperature_to_exit_deactivated_state: 2.0
   # heat_exchanger_max_temperature: 10.0
   # temperature_delta_defrosting_started: 1.0
   # temperature_delta_excess_time_min: 8

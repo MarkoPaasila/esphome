@@ -179,9 +179,9 @@ bool MitsurunnerComponent::is_temperature_sane_(float t) const {
   return !std::isnan(t) && t >= TEMP_SANITY_MIN && t <= TEMP_SANITY_MAX;
 }
 
-bool MitsurunnerComponent::should_enter_off_(float heat_exchanger_temp, float outdoor_temp) const {
+bool MitsurunnerComponent::should_enter_deactivated_(float heat_exchanger_temp, float outdoor_temp) const {
   return heat_exchanger_temp > heat_exchanger_max_temperature_ ||
-         outdoor_temp > outdoor_temperature_to_enter_off_state_ || !runner_on_;
+         outdoor_temp > outdoor_temperature_to_enter_deactivated_state_ || !runner_on_;
 }
 
 bool MitsurunnerComponent::sensor_fault_detected_(float heat_exchanger_temp, float outdoor_temp,
@@ -220,7 +220,7 @@ void MitsurunnerComponent::set_defrost_allowed_enabled(bool allowed) {
     state_timer_duration_ms_ = 0;
     stop_forced_defrost_timer_();
     previous_state_ = state_;
-    state_ = ST_OFF;
+    state_ = ST_DEACTIVATED;
   }
 }
 
@@ -234,7 +234,7 @@ void MitsurunnerComponent::enter_reset_(uint32_t now_ms) {
   start_state_timer_ms_((uint32_t) reset_sensor_delay_sec_ * 1000, now_ms);
 }
 
-void MitsurunnerComponent::enter_off_() {
+void MitsurunnerComponent::enter_deactivated_() {
   if (allow_defrost_relay_) allow_defrost_relay_->turn_off();
   defrost_allowed_ = false;
   long_defrosting_ = false;
@@ -242,7 +242,7 @@ void MitsurunnerComponent::enter_off_() {
   state_timer_duration_ms_ = 0;
   stop_forced_defrost_timer_();
   previous_state_ = state_;
-  state_ = ST_OFF;
+  state_ = ST_DEACTIVATED;
 }
 
 void MitsurunnerComponent::enter_prevent_defrost_(uint32_t now_ms) {
@@ -320,7 +320,7 @@ void MitsurunnerComponent::publish_state_text_() {
     case ST_SENSOR_FAULT: text = "Sensor fault"; break;
     case ST_LONG_DEFROSTING_STARTED: text = "Long defrosting"; break;
     case ST_RESET: text = "Reset"; break;
-    case ST_OFF: text = "Off"; break;
+    case ST_DEACTIVATED: text = "Deactivated"; break;
     case ST_DEFROSTING_STARTED: text = "Defrosting"; break;
     case ST_HEATING_MIN_TIME: text = "Forced heating"; break;
     case ST_PREVENT_DEFROST: text = "Prevent defrost"; break;
@@ -363,8 +363,8 @@ void MitsurunnerComponent::run_state_machine_(uint32_t now_ms) {
   }
 
   if (state_ == ST_SENSOR_FAULT) {
-    if (should_enter_off_(heat_exchanger_temp, outdoor_temp))
-      enter_off_();
+    if (should_enter_deactivated_(heat_exchanger_temp, outdoor_temp))
+      enter_deactivated_();
     else
       enter_reset_(now_ms);
     return;
@@ -388,8 +388,8 @@ void MitsurunnerComponent::run_state_machine_(uint32_t now_ms) {
   switch (state_) {
     case ST_RESET:
       if (state_time_passed_) {
-        if (should_enter_off_(heat_exchanger_temp, outdoor_temp)) {
-          enter_off_();
+        if (should_enter_deactivated_(heat_exchanger_temp, outdoor_temp)) {
+          enter_deactivated_();
         } else if (temperature_delta >= temperature_delta_defrosting_started_) {
           enter_defrosting_started_(now_ms);
         } else {
@@ -399,8 +399,8 @@ void MitsurunnerComponent::run_state_machine_(uint32_t now_ms) {
       break;
 
     case ST_PREVENT_DEFROST:
-      if (should_enter_off_(heat_exchanger_temp, outdoor_temp)) {
-        enter_off_();
+      if (should_enter_deactivated_(heat_exchanger_temp, outdoor_temp)) {
+        enter_deactivated_();
       } else if (max_heating_time_passed_ || manual_defrosting_) {
         enter_start_defrosting_(now_ms);
       } else if (temperature_delta <= temperature_delta_to_defrost_) {
@@ -408,10 +408,10 @@ void MitsurunnerComponent::run_state_machine_(uint32_t now_ms) {
       }
       break;
 
-    case ST_OFF:
-      // Hysteresis: enter OFF when outdoor > enter threshold (3°C), exit when outdoor < exit (2°C)
+    case ST_DEACTIVATED:
+      // Hysteresis: enter Deactivated when outdoor > enter threshold (3°C), exit when outdoor < exit (2°C)
       if (heat_exchanger_temp < heat_exchanger_max_temperature_ &&
-          outdoor_temp < outdoor_temperature_to_exit_off_state_ && runner_on_) {
+          outdoor_temp < outdoor_temperature_to_exit_deactivated_state_ && runner_on_) {
         start_forced_defrost_timer_(now_ms);
         enter_prevent_defrost_(now_ms);
       }

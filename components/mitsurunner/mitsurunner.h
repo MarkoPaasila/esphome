@@ -66,7 +66,7 @@ enum MitsurunnerState {
   ST_SENSOR_FAULT = -6,
   ST_LONG_DEFROSTING_STARTED = -5,
   ST_RESET = -4,
-  ST_OFF = -3,
+  ST_DEACTIVATED = -3,
   ST_DEFROSTING_STARTED = -2,
   ST_HEATING_MIN_TIME = -1,
   ST_PREVENT_DEFROST = 0,
@@ -94,8 +94,8 @@ class MitsurunnerComponent : public PollingComponent {
   void request_manual_defrost();
 
   void set_temperature_delta_to_defrost(float v) { temperature_delta_to_defrost_ = v; }
-  void set_outdoor_temperature_to_enter_off_state(float v) { outdoor_temperature_to_enter_off_state_ = v; }
-  void set_outdoor_temperature_to_exit_off_state(float v) { outdoor_temperature_to_exit_off_state_ = v; }
+  void set_outdoor_temperature_to_enter_deactivated_state(float v) { outdoor_temperature_to_enter_deactivated_state_ = v; }
+  void set_outdoor_temperature_to_exit_deactivated_state(float v) { outdoor_temperature_to_exit_deactivated_state_ = v; }
   void set_heat_exchanger_max_temperature(float v) { heat_exchanger_max_temperature_ = v; }
   void set_temperature_delta_defrosting_started(float v) { temperature_delta_defrosting_started_ = v; }
   void set_temperature_delta_excess_time_min(int v) { temperature_delta_excess_time_min_ = v; }
@@ -130,8 +130,8 @@ class MitsurunnerComponent : public PollingComponent {
   float last_temperature_delta_{0.0f};
 
   float temperature_delta_to_defrost_{-5.0f};
-  float outdoor_temperature_to_enter_off_state_{3.0f};
-  float outdoor_temperature_to_exit_off_state_{2.0f};
+  float outdoor_temperature_to_enter_deactivated_state_{3.0f};
+  float outdoor_temperature_to_exit_deactivated_state_{2.0f};
   float heat_exchanger_max_temperature_{10.0f};
   float temperature_delta_defrosting_started_{1.0f};
   int temperature_delta_excess_time_min_{8};
@@ -181,14 +181,14 @@ class MitsurunnerComponent : public PollingComponent {
   void publish_defrost_allowed_();
   bool check_state_timer_(uint32_t now_ms);
   bool timer_elapsed_(uint32_t start_ms, uint32_t duration_ms, uint32_t now_ms) const;
-  bool should_enter_off_(float heat_exchanger_temp, float outdoor_temp) const;
+  bool should_enter_deactivated_(float heat_exchanger_temp, float outdoor_temp) const;
   bool is_temperature_sane_(float t) const;
   bool sensor_fault_detected_(float heat_exchanger_temp, float outdoor_temp,
                               bool heat_exchanger_has_state, bool outdoor_has_state,
                               uint32_t now_ms) const;
   void enter_sensor_fault_(uint32_t now_ms);
   void enter_reset_(uint32_t now_ms);
-  void enter_off_();
+  void enter_deactivated_();
   void enter_prevent_defrost_(uint32_t now_ms);
   void enter_temp_exceeded_(uint32_t now_ms);
   void enter_temp_exceeded_temp_decreasing_(uint32_t now_ms);

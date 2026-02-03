@@ -49,8 +49,8 @@ CONF_DEFROST_NOW = "defrost_now"
 
 # Optional timing/threshold constants (from constants.h)
 CONF_TEMPERATURE_DELTA_TO_DEFROST = "temperature_delta_to_defrost"
-CONF_OUTDOOR_TEMPERATURE_TO_ENTER_OFF_STATE = "outdoor_temperature_to_enter_off_state"
-CONF_OUTDOOR_TEMPERATURE_TO_EXIT_OFF_STATE = "outdoor_temperature_to_exit_off_state"
+CONF_OUTDOOR_TEMPERATURE_TO_ENTER_DEACTIVATED_STATE = "outdoor_temperature_to_enter_deactivated_state"
+CONF_OUTDOOR_TEMPERATURE_TO_EXIT_DEACTIVATED_STATE = "outdoor_temperature_to_exit_deactivated_state"
 CONF_HEAT_EXCHANGER_MAX_TEMPERATURE = "heat_exchanger_max_temperature"
 CONF_TEMPERATURE_DELTA_DEFROSTING_STARTED = "temperature_delta_defrosting_started"
 CONF_TEMPERATURE_DELTA_EXCESS_TIME_MIN = "temperature_delta_excess_time_min"
@@ -110,8 +110,8 @@ CONFIG_SCHEMA = cv.All(
                 MitsurunnerDefrostNowButton
             ),
             cv.Optional(CONF_TEMPERATURE_DELTA_TO_DEFROST, default=-5.0): cv.float_,
-            cv.Optional(CONF_OUTDOOR_TEMPERATURE_TO_ENTER_OFF_STATE, default=3.0): cv.float_,
-            cv.Optional(CONF_OUTDOOR_TEMPERATURE_TO_EXIT_OFF_STATE, default=2.0): cv.float_,
+            cv.Optional(CONF_OUTDOOR_TEMPERATURE_TO_ENTER_DEACTIVATED_STATE, default=3.0): cv.float_,
+            cv.Optional(CONF_OUTDOOR_TEMPERATURE_TO_EXIT_DEACTIVATED_STATE, default=2.0): cv.float_,
             cv.Optional(CONF_HEAT_EXCHANGER_MAX_TEMPERATURE, default=10.0): cv.float_,
             cv.Optional(CONF_TEMPERATURE_DELTA_DEFROSTING_STARTED, default=1.0): cv.float_,
             cv.Optional(CONF_TEMPERATURE_DELTA_EXCESS_TIME_MIN, default=8): cv.positive_int,
@@ -141,8 +141,8 @@ async def to_code(config):
     cg.add(var.set_allow_defrost_relay(relay))
 
     cg.add(var.set_temperature_delta_to_defrost(config[CONF_TEMPERATURE_DELTA_TO_DEFROST]))
-    cg.add(var.set_outdoor_temperature_to_enter_off_state(config[CONF_OUTDOOR_TEMPERATURE_TO_ENTER_OFF_STATE]))
-    cg.add(var.set_outdoor_temperature_to_exit_off_state(config[CONF_OUTDOOR_TEMPERATURE_TO_EXIT_OFF_STATE]))
+    cg.add(var.set_outdoor_temperature_to_enter_deactivated_state(config[CONF_OUTDOOR_TEMPERATURE_TO_ENTER_DEACTIVATED_STATE]))
+    cg.add(var.set_outdoor_temperature_to_exit_deactivated_state(config[CONF_OUTDOOR_TEMPERATURE_TO_EXIT_DEACTIVATED_STATE]))
     cg.add(var.set_heat_exchanger_max_temperature(config[CONF_HEAT_EXCHANGER_MAX_TEMPERATURE]))
     cg.add(var.set_temperature_delta_defrosting_started(config[CONF_TEMPERATURE_DELTA_DEFROSTING_STARTED]))
     cg.add(var.set_temperature_delta_excess_time_min(config[CONF_TEMPERATURE_DELTA_EXCESS_TIME_MIN]))

@@ -22,9 +22,9 @@ mitsurunner:
   #   name: "Defrost Now"                                      # default
   #   id: defrost_now                                          # optional id
   # temperature_delta_to_defrost: -5.0                           # Coil vs outdoor delta below which we consider defrost (default -5.0)
-  # outdoor_temperature_to_enter_off_state: 3.0                   # Outdoor temp above this: disable defrost logic (default 3.0)
-  # outdoor_temperature_to_exit_off_state: 2.0                   # Outdoor temp below this: re-enable (hysteresis) (default 2.0)
-  # heat_exchanger_max_temperature: 10.0                        # Coil temp above this: enter OFF (default 10.0)
+  # outdoor_temperature_to_enter_deactivated_state: 3.0          # Outdoor temp above this: disable defrost logic (default 3.0)
+  # outdoor_temperature_to_exit_deactivated_state: 2.0            # Outdoor temp below this: re-enable (hysteresis) (default 2.0)
+  # heat_exchanger_max_temperature: 10.0                        # Coil temp above this: enter Deactivated (default 10.0)
   # temperature_delta_defrosting_started: 1.0                   # Delta at which we consider defrost cycle started (default 1.0)
   # temperature_delta_excess_time_min: 8                        # Minutes delta must be bad before allowing defrost (default 8)
   # temperature_delta_decreasing_excess_time_min: 5             # Same when delta is improving (default 5)
@@ -48,11 +48,11 @@ mitsurunner:
 
 - **Temperature delta** = heat exchanger temperature − outdoor temperature. Negative means the coil is colder than ambient (frost condition).
 
-- **Startup:** Relay is off (unit sees real NTC). After `initialize_delay_sec`, the component waits `reset_sensor_delay_sec` in **Reset**, then goes to **Off**, **Defrosting** (if delta already high), or **Prevent defrost**.
+- **Startup:** Relay is off (unit sees real NTC). After `initialize_delay_sec`, the component waits `reset_sensor_delay_sec` in **Reset**, then goes to **Deactivated**, **Defrosting** (if delta already high), or **Prevent defrost**.
 
-- **Off**  
-  Enter when: outdoor > `outdoor_temperature_to_enter_off_state`, or heat exchanger > `heat_exchanger_max_temperature`, or smart-defrost switch is off.  
-  Relay off. Exit when outdoor < `outdoor_temperature_to_exit_off_state`, coil < max temp, and smart-defrost is on → **Prevent defrost**.
+- **Deactivated**  
+  Enter when: outdoor > `outdoor_temperature_to_enter_deactivated_state`, or heat exchanger > `heat_exchanger_max_temperature`, or smart-defrost switch is off.  
+  Relay off. Exit when outdoor < `outdoor_temperature_to_exit_deactivated_state`, coil < max temp, and smart-defrost is on → **Prevent defrost**.
 
 - **Prevent defrost**  
   Relay off. A “max heating” timer runs; if it reaches `max_heating_time_min` or user triggers manual defrost → **Start defrosting**. If delta ≤ `temperature_delta_to_defrost` → **Temp exceeded**.
@@ -73,23 +73,23 @@ mitsurunner:
   Relay off for `min_heating_time_min - defrost_duration_min` to avoid immediate re-defrost. Then → **Prevent defrost**. If max heating time is reached during this period → **Start defrosting** again.
 
 - **Sensor fault**  
-  If sensors are missing, out of range, or outdoor sensor is stale (e.g. > 5 min), defrost is disallowed (relay off). After 60 minutes in fault, relay is forced off. Recovery goes to **Off** or **Reset** depending on temperatures.
+  If sensors are missing, out of range, or outdoor sensor is stale (e.g. > 5 min), defrost is disallowed (relay off). After 60 minutes in fault, relay is forced off. Recovery goes to **Deactivated** or **Reset** depending on temperatures.
 
 - **Smart-defrost switch**  
-  When the optional “Smart Defrost Logic” switch is off, component enters **Off** (relay off): unit always sees the real NTC and uses its built-in defrost logic.
+  When the optional “Smart Defrost Logic” switch is off, component enters **Deactivated** (relay off): unit always sees the real NTC and uses its built-in defrost logic.
 
 ---
 
 ## 4. Hardware setup (MitsuRunner-specific)
 
-- **Relay:** Single-pole (or equivalent) so the heat pump’s defrost NTC input is either connected to the **real NTC** or to a **33 kΩ resistor**.
+- **Relay:** Dual-pole (or equivalent) so the heat pump’s defrost NTC input is either connected to the **real NTC** or to a **33 kΩ resistor**.
   - **Common:** Connect to the outdoor unit’s defrost NTC input (where the original NTC was or in series as required by your unit).
   - **NC (normally closed):** Connect the **NTC thermistor** here.
   - **NO (normally open):** Connect a **33 kΩ resistor** here.
 
-  So when the relay is **not energized** (e.g. ESP off or MitsuRunner off), the unit sees the **NTC** and uses its original defrost behavior. When the relay **is energized**, the unit sees the **33 kΩ** and MitsuRunner controls when defrost is allowed.
+  When the relay is **not energized** (e.g. ESP off or MitsuRunner off), the unit sees the **NTC** and uses its original defrost behavior. When the relay **is energized**, the unit sees the **33 kΩ** and MitsuRunner controls when defrost is allowed.
 
-- **ESPHome relay switch:** Configure the GPIO switch for this relay as **inverted** so that when MitsuRunner turns the switch **on**, the relay energizes and the unit sees the 33 kΩ (defrost allowed). Example:
+- **ESPHome relay switch:** Configure the GPIO switch for this relay as **inverted** so that when MitsuRunner turns the switch **on**, the relay de-energizes and the unit sees the 33 kΩ (defrost allowed). Example:
 
   ```yaml
   switch:
@@ -101,7 +101,7 @@ mitsurunner:
 
 - **Sensors:** You need two temperature sensors (e.g. DS18B20 or similar):
   - **Heat exchanger:** Mounted on or near the outdoor coil (used for delta and “defrost started”).
-  - **Outdoor:** Ambient outdoor air (used for delta and OFF-state hysteresis).
+  - **Outdoor:** Ambient outdoor air (used for delta and Deactivated-state hysteresis).
 
 - No other MitsuRunner-specific hardware is required; the rest is standard ESP/ESPHome (power, enclosure, etc.).
 
