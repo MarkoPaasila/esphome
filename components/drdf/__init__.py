@@ -3,14 +3,19 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome.components import sensor
-from esphome.const import CONF_ALPHA
+from esphome.const import CONF_ALPHA, CONF_ID, CONF_NAME
 
 DEPENDENCIES = ["sensor"]
 
 CONF_EMA_MULTIPLIER = "ema_multiplier"
+CONF_INPUT_SENSOR_ID = "input_sensor_id"
+CONF_DEADBAND_MULTIPLIER = "deadband_multiplier"
+CONF_UPPER_BOUND = "upper_bound"
+CONF_LOWER_BOUND = "lower_bound"
 
 drdf_ns = cg.esphome_ns.namespace("drdf")
 DrdfFilter = drdf_ns.class_("DrdfFilter", sensor.Filter)
+DrdfSensor = drdf_ns.class_("DrdfSensor", cg.Component, sensor.Sensor)
 
 DRDF_SCHEMA = cv.Schema(
     {

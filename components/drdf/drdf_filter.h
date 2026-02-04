@@ -16,6 +16,9 @@ class DrdfFilter : public sensor::Filter {
 
   optional<float> new_value(float value) override;
 
+  float get_upper_bound() const { return upper_bound_; }
+  float get_lower_bound() const { return lower_bound_; }
+
  protected:
   float upper_bound_{NAN};
   float lower_bound_{NAN};

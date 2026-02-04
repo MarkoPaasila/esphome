@@ -2,7 +2,11 @@
 
 ESPHome sensor filter that implements a **dynamic deadband** based on observed trend reversals. The deadband size adapts from the sensor’s reversal pattern (often related to noise); the output is always the midpoint of the sliding deadband.
 
+You can use this component in two ways: as a **filter** in any sensor’s `filters` list, or as a **sensor platform** (`sensor: - platform: drdf`) that takes an input sensor and optionally exposes diagnostic sensors (upper/lower bound). See below for both.
+
 ## Configuration
+
+### As a filter
 
 Use `drdf` in any sensor’s `filters` list like other built-in filters.
 
@@ -57,3 +61,21 @@ sensor:
 ```
 
 Internal state (`ema_value`, `deadband_size`) resets on reboot; persistence is not implemented in this component.
+
+### As a sensor platform
+
+Use `sensor: - platform: drdf` when you want a dedicated DRDF sensor that reads from another sensor and can expose upper/lower bound as optional diagnostic sensors. Full configuration block:
+
+```yaml
+sensor:
+  - platform: drdf
+    id: my_drdf_sensor              # optional: use id or name (at least one required)
+    name: "My DRDF Filtered Value"   # optional: display name
+    input_sensor_id: my_source_sensor_id   # required: sensor to filter
+    alpha: 0.01                      # optional: EMA smoothing for reversal differences (default 0.01)
+    deadband_multiplier: 3.82        # optional: deadband = EMA × this (default 3.82)
+    upper_bound:                     # optional: diagnostic sensor for current upper bound
+      name: "DRDF Upper Bound"
+    lower_bound:                     # optional: diagnostic sensor for current lower bound
+      name: "DRDF Lower Bound"
+```
