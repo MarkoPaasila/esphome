@@ -157,7 +157,8 @@ sensor:
   - platform: drdf
     name: "Temperature Out DRDF"
     input_sensor_id: tout
-    alpha: 0.01
+    alpha: 0.1
+    bias_ema_alpha: 0.1
     deadband_multiplier: 3.82
     unit_of_measurement: "°C"
     device_class: temperature
@@ -170,7 +171,8 @@ sensor:
   - platform: drdf
     name: "Humidity Outlet DRDF"
     input_sensor_id: hout
-    alpha: 0.01
+    alpha: 0.1
+    bias_ema_alpha: 0.1
     deadband_multiplier: 3.82
     unit_of_measurement: "%"
     device_class: humidity
