@@ -108,27 +108,39 @@ sensor:
 # -------------- SHT30 ------------------ #
   - platform: sht3xd
     i2c_id: i2c0
-    update_interval: 10s
+    update_interval: 1s
     temperature:
       id: tin
       filters:
-        - drdf
-        - delta: 0.5
+        - drdf:
+            bias_ema_alpha: 0.1
+            alpha: 0.1
+        - delta: 0.1
     humidity:
       id: hin
       filters:
-        - drdf
-        - delta: 1
+        - drdf:
+            bias_ema_alpha: 0.1
+            alpha: 0.1
+        - delta: 0.2
   - platform: sht3xd
     i2c_id: i2c1
     update_interval: 1s
     temperature:
-      name: "Temperature Outlet"
       id: tout
+      filters:
+        - drdf:
+            bias_ema_alpha: 0.1
+            alpha: 0.1
+        - delta: 0.1
     humidity:
       id: hout
-      name: "Humidity Outlet"
-
+      filters:
+        - drdf:
+            bias_ema_alpha: 0.1
+            alpha: 0.1
+        - delta: 0.2
+      
 # ------------- DS18B20 ------------------ #
   - id: heat_exchanger_temp
     name: "Outdoor unit heat exchanger temperature"
@@ -137,10 +149,12 @@ sensor:
     accuracy_decimals: 2
     device_class: temperature
     state_class: measurement
-    update_interval: 10s
+    update_interval: 1s
     filters:
-        - drdf
-        - delta: 0.5
+        - drdf:
+            bias_ema_alpha: 0.1
+            alpha: 0.1
+        - delta: 0.1
   - id: outdoor_temp
     name: "Outdoor temperature"
     platform: dallas_temp
@@ -148,44 +162,46 @@ sensor:
     accuracy_decimals: 2
     device_class: temperature
     state_class: measurement
-    update_interval: 10s
+    update_interval: 1s
     filters:
-        - drdf
-        - delta: 0.5
+      - drdf:
+          bias_ema_alpha: 0.1
+          alpha: 0.1
+      - delta: 0.1
 
 # ------------- DRDF ------------------ #
-  - platform: drdf
-    name: "Temperature Out DRDF"
-    input_sensor_id: tout
-    alpha: 0.1
-    bias_ema_alpha: 0.1
-    deadband_multiplier: 3.82
-    unit_of_measurement: "°C"
-    device_class: temperature
-    state_class: measurement
-    accuracy_decimals: 2
-    upper_bound:
-      name: "Temperature Out DRDF Upper Bound"
-    lower_bound:
-      name: "Temperature Out DRDF Lower Bound"
-    filters:
-      - delta: 0.1
-  - platform: drdf
-    name: "Humidity Outlet DRDF"
-    input_sensor_id: hout
-    alpha: 0.1
-    bias_ema_alpha: 0.1
-    deadband_multiplier: 3.82
-    unit_of_measurement: "%"
-    device_class: humidity
-    state_class: measurement
-    accuracy_decimals: 2
-    upper_bound:
-      name: "Humidity Outlet DRDF Upper Bound"
-    lower_bound:
-      name: "Humidity Outlet DRDF Lower Bound"
-    filters:
-      - delta: 0.1
+#  - platform: drdf
+#    name: "Temperature Out DRDF"
+#    input_sensor_id: tout
+#    alpha: 0.1
+#    bias_ema_alpha: 0.1
+#    deadband_multiplier: 3.82
+#    unit_of_measurement: "°C"
+#    device_class: temperature
+#    state_class: measurement
+#    accuracy_decimals: 2
+#    upper_bound:
+#      name: "Temperature Out DRDF Upper Bound"
+#    lower_bound:
+#      name: "Temperature Out DRDF Lower Bound"
+#    filters:
+#      - delta: 0.1
+#  - platform: drdf
+#    name: "Humidity Outlet DRDF"
+#    input_sensor_id: hout
+#    alpha: 0.1
+#    bias_ema_alpha: 0.1
+#    deadband_multiplier: 3.82
+#    unit_of_measurement: "%"
+#    device_class: humidity
+#    state_class: measurement
+#    accuracy_decimals: 2
+#    upper_bound:
+#      name: "Humidity Outlet DRDF Upper Bound"
+#    lower_bound:
+#      name: "Humidity Outlet DRDF Lower Bound"
+#    filters:
+#      - delta: 0.2
 # ------------- Other --------------------- #
 #  - platform: debug
 #    free:
