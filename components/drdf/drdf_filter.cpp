@@ -29,11 +29,22 @@ optional<float> DrdfFilter::new_value(float value) {
     current_trend = 0;
   }
 
+  // Slide bounds when value exceeds them (band width = deadband_size_).
+  // Do this before reversal logic so the band always slides when value is
+  // outside, regardless of reversal on this sample.
+  if (current_value > upper_bound_) {
+    upper_bound_ = current_value;
+    lower_bound_ = current_value - deadband_size_;
+  } else if (current_value < lower_bound_) {
+    lower_bound_ = current_value;
+    upper_bound_ = current_value + deadband_size_;
+  }
+
   // Check if trend has reversed (not neutral and different from previous trend)
   bool trend_reversed =
       (trend_ != 0 && current_trend != 0 && trend_ != current_trend);
 
-  // Detect consecutive reversals and update EMA
+  // Detect consecutive reversals and update EMA (size only; position changed by sliding above)
   if (trend_reversed) {
     if (reversal_detected_) {
       float reversal_diff = fabsf(current_value - reversal_value_);
@@ -51,15 +62,6 @@ optional<float> DrdfFilter::new_value(float value) {
     }
   } else {
     reversal_detected_ = false;
-  }
-
-  // Slide bounds when value exceeds them (band width = deadband_size_)
-  if (current_value > upper_bound_) {
-    upper_bound_ = current_value;
-    lower_bound_ = current_value - deadband_size_;
-  } else if (current_value < lower_bound_) {
-    lower_bound_ = current_value;
-    upper_bound_ = current_value + deadband_size_;
   }
 
   previous_value_ = current_value;
