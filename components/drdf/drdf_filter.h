@@ -12,12 +12,14 @@ namespace drdf {
  */
 class DrdfFilter : public sensor::Filter {
  public:
-  DrdfFilter(float alpha, float ema_multiplier, float bias_ema_alpha = 0.1f);
+  DrdfFilter(float alpha, float ema_multiplier, bool bias_enabled, float bias_ema_alpha);
 
   optional<float> new_value(float value) override;
 
   float get_upper_bound() const { return upper_bound_; }
   float get_lower_bound() const { return lower_bound_; }
+  bool is_bias_enabled() const { return bias_enabled_; }
+  float get_bias_ema_alpha() const { return bias_ema_alpha_; }
 
  protected:
   float upper_bound_{NAN};
@@ -30,6 +32,7 @@ class DrdfFilter : public sensor::Filter {
   float deadband_size_{0.0f};
   float alpha_{0.01f};
   float ema_multiplier_{3.82f};
+  bool bias_enabled_{false};
   float bias_ema_alpha_{0.1f};
   float bias_ema_{0.0f};
   bool reversal_detected_{false};

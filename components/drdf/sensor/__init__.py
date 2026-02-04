@@ -23,7 +23,7 @@ CONFIG_SCHEMA = cv.All(
             cv.Required(CONF_INPUT_SENSOR_ID): cv.use_id(sensor.Sensor),
             cv.Optional(CONF_ALPHA, default=0.01): cv.positive_float,
             cv.Optional(CONF_DEADBAND_MULTIPLIER, default=3.82): cv.positive_float,
-            cv.Optional(CONF_BIAS_EMA_ALPHA, default=0.1): cv.positive_float,
+            cv.Optional(CONF_BIAS_EMA_ALPHA): cv.positive_float,
             cv.Optional(CONF_UPPER_BOUND): sensor.sensor_schema(),
             cv.Optional(CONF_LOWER_BOUND): sensor.sensor_schema(),
         }
@@ -43,11 +43,14 @@ def _inherit_sensor_attrs(parent_config, child_config):
 
 
 async def to_code(config):
+    bias_enabled = CONF_BIAS_EMA_ALPHA in config
+    bias_alpha = config[CONF_BIAS_EMA_ALPHA] if bias_enabled else 0.1
     var = cg.new_Pvariable(
         config[CONF_ID],
         config.get(CONF_ALPHA, 0.01),
         config.get(CONF_DEADBAND_MULTIPLIER, 3.82),
-        config.get(CONF_BIAS_EMA_ALPHA, 0.1),
+        bias_enabled,
+        bias_alpha,
     )
     await cg.register_component(var, config)
     await sensor.register_sensor(var, config)

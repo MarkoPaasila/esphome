@@ -23,6 +23,13 @@ sensor:
 ### With options
 
 ```yaml
+# Midpoint only (bias disabled; omit bias_ema_alpha):
+filters:
+  - drdf:
+      alpha: 0.01
+      ema_multiplier: 3.82
+
+# With bias correction (output shifts toward trend side):
 filters:
   - drdf:
       alpha: 0.01
@@ -34,14 +41,14 @@ filters:
 |--------------------|--------|-------------|
 | `alpha`            | `0.01` | EMA smoothing factor for reversal differences. Smaller = slower adaptation. |
 | `ema_multiplier`   | `3.82` | Multiplier for deadband size (deadband = EMA × multiplier). Smaller = tighter band, more noise in output. |
-| `bias_ema_alpha`   | `0.1`  | EMA factor for position-in-band bias; higher = faster tracking of trend. Output = center + bias_ema × half_width (bias not clamped). |
+| `bias_ema_alpha`   | —      | Optional. When set: EMA factor for position-in-band bias; output = center + bias_ema × half_width (bias not clamped). When omitted: bias is disabled and output is the deadband midpoint. |
 
 ## Behavior
 
 - Tracks trend (up / down / neutral) and detects **consecutive reversals** (e.g. up→down→up).
 - **Deadband size** is updated only when reversals happen: on two consecutive reversals, the absolute difference between reversal points is fed into an EMA, and deadband size = EMA × `ema_multiplier` (default 3.82 is aimed at ~99% of reversals if roughly normal).
 - **Deadband position** slides only when the raw value goes above the upper bound or below the lower bound (no re-centering on reversal). When the value crosses the upper bound the band slides up; when it crosses the lower bound the band slides down.
-- **Output:** The filter tracks the input's position in the band (relative to center). An EMA of this position gives a bias; output = center + bias × half_width. The bias is not clamped, so the output can move beyond the band when the input stays on one side. With default `bias_ema_alpha` (0.1), the output shifts toward the side where the input has been trending.
+- **Output:** If `bias_ema_alpha` is not configured, the output is always the deadband midpoint. If `bias_ema_alpha` is set, the filter tracks the input's position in the band (relative to center); an EMA of this position gives a bias, and output = center + bias × half_width. The bias is not clamped, so the output can move beyond the band when the input stays on one side.
 
 ## Filter order
 
@@ -76,7 +83,7 @@ sensor:
     input_sensor_id: my_source_sensor_id   # required: sensor to filter
     alpha: 0.01                      # optional: EMA smoothing for reversal differences (default 0.01)
     deadband_multiplier: 3.82        # optional: deadband = EMA × this (default 3.82)
-    bias_ema_alpha: 0.1              # optional: EMA for position-in-band bias (default 0.1)
+    bias_ema_alpha: 0.1              # optional: when set, enables bias (output shifts with trend); when omitted, output is midpoint only
     unit_of_measurement: "°C"        # optional: set for Home Assistant graphs (inherited by upper/lower bound)
     device_class: temperature       # optional: for HA (inherited by upper/lower bound)
     state_class: measurement        # optional: for HA (inherited by upper/lower bound)

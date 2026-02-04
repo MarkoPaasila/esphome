@@ -36,7 +36,12 @@ void DrdfSensor::on_input_state_(float value) {
 }
 
 void DrdfSensor::dump_config() {
-  ESP_LOGCONFIG(TAG, "DRDF sensor:");
+  if (filter_.is_bias_enabled()) {
+    ESP_LOGCONFIG(TAG, "DRDF sensor (bias correction: bias_ema_alpha=%.3f):",
+                  filter_.get_bias_ema_alpha());
+  } else {
+    ESP_LOGCONFIG(TAG, "DRDF sensor (bias disabled, midpoint):");
+  }
   LOG_SENSOR("  ", "Input", input_sensor_);
   if (upper_bound_sensor_ != nullptr) {
     LOG_SENSOR("  ", "Upper bound", upper_bound_sensor_);

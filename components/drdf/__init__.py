@@ -26,7 +26,7 @@ DRDF_SCHEMA = cv.Schema(
     {
         cv.Optional(CONF_ALPHA, default=0.01): cv.positive_float,
         cv.Optional(CONF_EMA_MULTIPLIER, default=3.82): cv.positive_float,
-        cv.Optional(CONF_BIAS_EMA_ALPHA, default=0.1): cv.positive_float,
+        cv.Optional(CONF_BIAS_EMA_ALPHA): cv.positive_float,
     }
 )
 
@@ -34,11 +34,14 @@ DRDF_SCHEMA = cv.Schema(
 @sensor.FILTER_REGISTRY.register("drdf", DrdfFilter, DRDF_SCHEMA)
 async def drdf_filter_to_code(config, filter_id):
     """Generate the DRDF filter C++ code."""
+    bias_enabled = CONF_BIAS_EMA_ALPHA in config
+    bias_alpha = config[CONF_BIAS_EMA_ALPHA] if bias_enabled else 0.1
     var = cg.new_Pvariable(
         filter_id,
         config.get(CONF_ALPHA, 0.01),
         config.get(CONF_EMA_MULTIPLIER, 3.82),
-        config.get(CONF_BIAS_EMA_ALPHA, 0.1),
+        bias_enabled,
+        bias_alpha,
     )
     return var
 
