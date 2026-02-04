@@ -9,7 +9,8 @@ namespace drdf {
 
 class DrdfSensor : public Component, public sensor::Sensor {
  public:
-  DrdfSensor(float alpha, float ema_multiplier) : filter_(alpha, ema_multiplier) {}
+  DrdfSensor(float alpha, float ema_multiplier, float bias_ema_alpha)
+      : filter_(alpha, ema_multiplier, bias_ema_alpha) {}
 
   void set_input_sensor(sensor::Sensor *sensor) { input_sensor_ = sensor; }
   void set_upper_bound_sensor(sensor::Sensor *sensor) { upper_bound_sensor_ = sensor; }

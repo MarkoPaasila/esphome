@@ -6,6 +6,7 @@ from esphome.components import sensor
 from esphome.const import CONF_ALPHA, CONF_ID, CONF_NAME
 
 from .. import (
+    CONF_BIAS_EMA_ALPHA,
     CONF_DEADBAND_MULTIPLIER,
     CONF_INPUT_SENSOR_ID,
     CONF_LOWER_BOUND,
@@ -22,6 +23,7 @@ CONFIG_SCHEMA = cv.All(
             cv.Required(CONF_INPUT_SENSOR_ID): cv.use_id(sensor.Sensor),
             cv.Optional(CONF_ALPHA, default=0.01): cv.positive_float,
             cv.Optional(CONF_DEADBAND_MULTIPLIER, default=3.82): cv.positive_float,
+            cv.Optional(CONF_BIAS_EMA_ALPHA, default=0.1): cv.positive_float,
             cv.Optional(CONF_UPPER_BOUND): sensor.sensor_schema(),
             cv.Optional(CONF_LOWER_BOUND): sensor.sensor_schema(),
         }
@@ -45,6 +47,7 @@ async def to_code(config):
         config[CONF_ID],
         config.get(CONF_ALPHA, 0.01),
         config.get(CONF_DEADBAND_MULTIPLIER, 3.82),
+        config.get(CONF_BIAS_EMA_ALPHA, 0.1),
     )
     await cg.register_component(var, config)
     await sensor.register_sensor(var, config)

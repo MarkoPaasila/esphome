@@ -11,6 +11,7 @@ DEPENDENCIES = ["sensor"]
 # "drdf" filter is registered before sensor configs that use "filters: - drdf" are validated.
 CONFIG_SCHEMA = cv.Schema({})
 
+CONF_BIAS_EMA_ALPHA = "bias_ema_alpha"
 CONF_EMA_MULTIPLIER = "ema_multiplier"
 CONF_INPUT_SENSOR_ID = "input_sensor_id"
 CONF_DEADBAND_MULTIPLIER = "deadband_multiplier"
@@ -25,6 +26,7 @@ DRDF_SCHEMA = cv.Schema(
     {
         cv.Optional(CONF_ALPHA, default=0.01): cv.positive_float,
         cv.Optional(CONF_EMA_MULTIPLIER, default=3.82): cv.positive_float,
+        cv.Optional(CONF_BIAS_EMA_ALPHA, default=0.1): cv.positive_float,
     }
 )
 
@@ -36,6 +38,7 @@ async def drdf_filter_to_code(config, filter_id):
         filter_id,
         config.get(CONF_ALPHA, 0.01),
         config.get(CONF_EMA_MULTIPLIER, 3.82),
+        config.get(CONF_BIAS_EMA_ALPHA, 0.1),
     )
     return var
 

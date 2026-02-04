@@ -168,6 +168,8 @@ sensor:
       name: "Temperature Out DRDF Upper Bound"
     lower_bound:
       name: "Temperature Out DRDF Lower Bound"
+    filters:
+      - delta: 0.1
   - platform: drdf
     name: "Humidity Outlet DRDF"
     input_sensor_id: hout
@@ -182,6 +184,8 @@ sensor:
       name: "Humidity Outlet DRDF Upper Bound"
     lower_bound:
       name: "Humidity Outlet DRDF Lower Bound"
+    filters:
+      - delta: 0.1
 # ------------- Other --------------------- #
 #  - platform: debug
 #    free:

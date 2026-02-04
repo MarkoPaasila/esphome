@@ -1,6 +1,6 @@
 # DRDF – Dynamic Reversals based Deadband Filter
 
-ESPHome sensor filter that implements a **dynamic deadband** based on observed trend reversals. The deadband size adapts from the sensor’s reversal pattern (often related to noise); the output is always the midpoint of the sliding deadband.
+ESPHome sensor filter that implements a **dynamic deadband** based on observed trend reversals. The deadband size adapts from the sensor’s reversal pattern (often related to noise). By default the output is the midpoint of the sliding deadband; optionally it can be shifted within (or beyond) the band using an EMA of the input's position in the band so that when the input trends to one side, the output follows.
 
 You can use this component in two ways: as a **filter** in any sensor’s `filters` list, or as a **sensor platform** (`sensor: - platform: drdf`) that takes an input sensor and optionally exposes diagnostic sensors (upper/lower bound). See below for both.
 
@@ -27,18 +27,21 @@ filters:
   - drdf:
       alpha: 0.01
       ema_multiplier: 3.82
+      bias_ema_alpha: 0.1
 ```
 
-| Option           | Default | Description |
-|------------------|--------|-------------|
-| `alpha`          | `0.01` | EMA smoothing factor for reversal differences. Smaller = slower adaptation. |
-| `ema_multiplier` | `3.82` | Multiplier for deadband size (deadband = EMA × multiplier). Smaller = tighter band, more noise in output. |
+| Option             | Default | Description |
+|--------------------|--------|-------------|
+| `alpha`            | `0.01` | EMA smoothing factor for reversal differences. Smaller = slower adaptation. |
+| `ema_multiplier`   | `3.82` | Multiplier for deadband size (deadband = EMA × multiplier). Smaller = tighter band, more noise in output. |
+| `bias_ema_alpha`   | `0.1`  | EMA factor for position-in-band bias; higher = faster tracking of trend. Output = center + bias_ema × half_width (bias not clamped). |
 
 ## Behavior
 
 - Tracks trend (up / down / neutral) and detects **consecutive reversals** (e.g. up→down→up).
 - **Deadband size** is updated only when reversals happen: on two consecutive reversals, the absolute difference between reversal points is fed into an EMA, and deadband size = EMA × `ema_multiplier` (default 3.82 is aimed at ~99% of reversals if roughly normal).
-- **Deadband position** slides only when the raw value goes above the upper bound or below the lower bound (no re-centering on reversal). When the value crosses the upper bound the band slides up; when it crosses the lower bound the band slides down. Output is always the center: `(upper_bound + lower_bound) / 2`.
+- **Deadband position** slides only when the raw value goes above the upper bound or below the lower bound (no re-centering on reversal). When the value crosses the upper bound the band slides up; when it crosses the lower bound the band slides down.
+- **Output:** The filter tracks the input's position in the band (relative to center). An EMA of this position gives a bias; output = center + bias × half_width. The bias is not clamped, so the output can move beyond the band when the input stays on one side. With default `bias_ema_alpha` (0.1), the output shifts toward the side where the input has been trending.
 
 ## Filter order
 
@@ -73,6 +76,7 @@ sensor:
     input_sensor_id: my_source_sensor_id   # required: sensor to filter
     alpha: 0.01                      # optional: EMA smoothing for reversal differences (default 0.01)
     deadband_multiplier: 3.82        # optional: deadband = EMA × this (default 3.82)
+    bias_ema_alpha: 0.1              # optional: EMA for position-in-band bias (default 0.1)
     unit_of_measurement: "°C"        # optional: set for Home Assistant graphs (inherited by upper/lower bound)
     device_class: temperature       # optional: for HA (inherited by upper/lower bound)
     state_class: measurement        # optional: for HA (inherited by upper/lower bound)

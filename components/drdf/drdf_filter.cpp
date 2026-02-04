@@ -4,8 +4,8 @@
 namespace esphome {
 namespace drdf {
 
-DrdfFilter::DrdfFilter(float alpha, float ema_multiplier)
-    : alpha_(alpha), ema_multiplier_(ema_multiplier) {}
+DrdfFilter::DrdfFilter(float alpha, float ema_multiplier, float bias_ema_alpha)
+    : alpha_(alpha), ema_multiplier_(ema_multiplier), bias_ema_alpha_(bias_ema_alpha) {}
 
 optional<float> DrdfFilter::new_value(float value) {
   const float current_value = value;
@@ -16,6 +16,7 @@ optional<float> DrdfFilter::new_value(float value) {
     lower_bound_ = current_value - deadband_size_ / 2.0f;
     trend_ = 0;
     previous_trend_ = 0;
+    bias_ema_ = 0.0f;
     return (upper_bound_ + lower_bound_) / 2.0f;
   }
 
@@ -68,7 +69,15 @@ optional<float> DrdfFilter::new_value(float value) {
   previous_trend_ = trend_;
   trend_ = current_trend;
 
-  return (upper_bound_ + lower_bound_) / 2.0f;
+  float center = (upper_bound_ + lower_bound_) / 2.0f;
+  float half = deadband_size_ / 2.0f;
+  if (half > 0.0f) {
+    float position = (current_value - center) / half;
+    bias_ema_ =
+        bias_ema_alpha_ * position + (1.0f - bias_ema_alpha_) * bias_ema_;
+    return center + bias_ema_ * half;
+  }
+  return center;
 }
 
 }  // namespace drdf
