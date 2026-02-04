@@ -7,6 +7,10 @@ from esphome.const import CONF_ALPHA, CONF_ID, CONF_NAME
 
 DEPENDENCIES = ["sensor"]
 
+# Optional top-level config: adding "drdf:" in YAML loads this component so the
+# "drdf" filter is registered before sensor configs that use "filters: - drdf" are validated.
+CONFIG_SCHEMA = cv.Schema({})
+
 CONF_EMA_MULTIPLIER = "ema_multiplier"
 CONF_INPUT_SENSOR_ID = "input_sensor_id"
 CONF_DEADBAND_MULTIPLIER = "deadband_multiplier"
@@ -34,3 +38,8 @@ async def drdf_filter_to_code(config, filter_id):
         config.get(CONF_EMA_MULTIPLIER, 3.82),
     )
     return var
+
+
+async def to_code(config):
+    """No C++ for top-level drdf; only ensures component loads so the filter is registered."""
+    pass

@@ -63,6 +63,9 @@ mitsurunner:
   defrost_now:
     name: "Defrost Now"
 
+# Load drdf component so the "drdf" filter is available in sensor filters
+drdf:
+
 sensor:
 # ----------------- PZEM ------------------ #
   - platform: pzemac
@@ -71,7 +74,8 @@ sensor:
     voltage:
       name: "Voltage"
       filters:
-        - throttle_average: 60s
+        - drdf
+        - delta: 1
     energy:
       name: "Energy"
       unit_of_measurement: "kWh"
@@ -91,9 +95,9 @@ sensor:
       state_class: measurement
       accuracy_decimals: 0
       filters:
-        - throttle_average: 60s
-        - delta: 2%
+        - drdf
         - delta: 50
+        - delta: 1%
 #    frequency:
 #      name: "Frequency"
 #    power_factor:
@@ -108,22 +112,22 @@ sensor:
     temperature:
       id: tin
       filters:
-        - throttle_average: 60s
+        - drdf
+        - delta: 0.5
     humidity:
       id: hin
       filters:
-        - throttle_average: 60s
+        - drdf
+        - delta: 1
   - platform: sht3xd
     i2c_id: i2c1
-    update_interval: 10s
+    update_interval: 1s
     temperature:
+      name: "Temperature Outlet"
       id: tout
-      filters:
-        - throttle_average: 60s
     humidity:
       id: hout
-      filters:
-        - throttle_average: 60s
+      name: "Humidity Outlet"
 
 # ------------- DS18B20 ------------------ #
   - id: heat_exchanger_temp
@@ -135,7 +139,8 @@ sensor:
     state_class: measurement
     update_interval: 10s
     filters:
-      - throttle_average: 60s
+        - drdf
+        - delta: 0.5
   - id: outdoor_temp
     name: "Outdoor temperature"
     platform: dallas_temp
@@ -145,8 +150,36 @@ sensor:
     state_class: measurement
     update_interval: 10s
     filters:
-      - throttle_average: 60s
+        - drdf
+        - delta: 0.5
 
+# ------------- DRDF ------------------ #
+  - platform: drdf
+    name: "Temperature Out DRDF"
+    input_sensor_id: tout
+    alpha: 0.01
+    deadband_multiplier: 3.82
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 2
+    upper_bound:
+      name: "Temperature Out DRDF Upper Bound"
+    lower_bound:
+      name: "Temperature Out DRDF Lower Bound"
+  - platform: drdf
+    name: "Humidity Outlet DRDF"
+    input_sensor_id: hout
+    alpha: 0.01
+    deadband_multiplier: 3.82
+    unit_of_measurement: "%"
+    device_class: humidity
+    state_class: measurement
+    accuracy_decimals: 2
+    upper_bound:
+      name: "Humidity Outlet DRDF Upper Bound"
+    lower_bound:
+      name: "Humidity Outlet DRDF Lower Bound"
 # ------------- Other --------------------- #
 #  - platform: debug
 #    free:
@@ -224,7 +257,7 @@ external_components:
   - source:
       type: local
       path: components
-    components: [ mitsurunner ]
+    components: [ mitsurunner, drdf ]
     refresh: 0s
 
 one_wire:

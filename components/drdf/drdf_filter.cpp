@@ -45,6 +45,12 @@ optional<float> DrdfFilter::new_value(float value) {
       }
       deadband_size_ = ema_value_ * ema_multiplier_;
       reversal_value_ = current_value;
+      // Apply new deadband to bounds so they actually spread (they may have
+      // been equal when deadband was 0; sliding only preserves current width).
+      float mid = (upper_bound_ + lower_bound_) / 2.0f;
+      float half = deadband_size_ / 2.0f;
+      upper_bound_ = mid + half;
+      lower_bound_ = mid - half;
     } else {
       reversal_detected_ = true;
       reversal_value_ = current_value;

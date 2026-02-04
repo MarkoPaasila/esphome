@@ -30,6 +30,16 @@ CONFIG_SCHEMA = cv.All(
 )
 
 
+def _inherit_sensor_attrs(parent_config, child_config):
+    """Copy unit/device_class/state_class/accuracy from parent into child when child does not set them."""
+    attrs = ("unit_of_measurement", "device_class", "state_class", "accuracy_decimals")
+    out = dict(child_config)
+    for key in attrs:
+        if key not in out and parent_config.get(key) is not None:
+            out[key] = parent_config[key]
+    return out
+
+
 async def to_code(config):
     var = cg.new_Pvariable(
         config[CONF_ID],
@@ -43,8 +53,10 @@ async def to_code(config):
     cg.add(var.set_input_sensor(input_sensor))
 
     if CONF_UPPER_BOUND in config:
-        ub_sens = await sensor.new_sensor(config[CONF_UPPER_BOUND])
+        ub_config = _inherit_sensor_attrs(config, config[CONF_UPPER_BOUND])
+        ub_sens = await sensor.new_sensor(ub_config)
         cg.add(var.set_upper_bound_sensor(ub_sens))
     if CONF_LOWER_BOUND in config:
-        lb_sens = await sensor.new_sensor(config[CONF_LOWER_BOUND])
+        lb_config = _inherit_sensor_attrs(config, config[CONF_LOWER_BOUND])
+        lb_sens = await sensor.new_sensor(lb_config)
         cg.add(var.set_lower_bound_sensor(lb_sens))

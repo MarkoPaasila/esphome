@@ -74,8 +74,13 @@ sensor:
     input_sensor_id: my_source_sensor_id   # required: sensor to filter
     alpha: 0.01                      # optional: EMA smoothing for reversal differences (default 0.01)
     deadband_multiplier: 3.82        # optional: deadband = EMA × this (default 3.82)
+    unit_of_measurement: "°C"        # optional: set for Home Assistant graphs (inherited by upper/lower bound)
+    device_class: temperature       # optional: for HA (inherited by upper/lower bound)
+    state_class: measurement        # optional: for HA (inherited by upper/lower bound)
     upper_bound:                     # optional: diagnostic sensor for current upper bound
       name: "DRDF Upper Bound"
     lower_bound:                     # optional: diagnostic sensor for current lower bound
       name: "DRDF Lower Bound"
 ```
+
+**Home Assistant:** Set `unit_of_measurement` (and optionally `device_class`, `state_class`) on the DRDF sensor so the filtered value and the optional upper/lower bound sensors are shown as graphs instead of text. Bound sensors inherit these from the main DRDF config when not set.
