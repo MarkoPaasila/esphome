@@ -37,9 +37,8 @@ filters:
 ## Behavior
 
 - Tracks trend (up / down / neutral) and detects **consecutive reversals** (e.g. up→down→up).
-- On two consecutive reversals, computes the absolute difference between reversal points and updates an EMA of these differences.
-- Deadband size = EMA × `ema_multiplier` (default 3.82 is aimed at ~99% of reversals if roughly normal).
-- Deadband **slides** with the raw value (no extra latency); output is always the center: `(upper_bound + lower_bound) / 2`.
+- **Deadband size** is updated only when reversals happen: on two consecutive reversals, the absolute difference between reversal points is fed into an EMA, and deadband size = EMA × `ema_multiplier` (default 3.82 is aimed at ~99% of reversals if roughly normal).
+- **Deadband position** slides only when the raw value goes above the upper bound or below the lower bound (no re-centering on reversal). When the value crosses the upper bound the band slides up; when it crosses the lower bound the band slides down. Output is always the center: `(upper_bound + lower_bound) / 2`.
 
 ## Filter order
 
